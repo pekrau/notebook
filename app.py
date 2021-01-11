@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 import flask
 import marko
@@ -73,7 +73,28 @@ def setup_template_context():
 @app.route('/')
 def home():
     "Home page; dashboard."
-    return flask.render_template("home.html")
+    root = settings["NOTES_ROOT"]
+    items = sorted(os.listdir(root))
+    folders = [i for i in items if os.path.isdir(os.path.join(root, i))]
+    notes = [os.path.splitext(i)[0] for i in items 
+             if os.path.isfile(os.path.join(root, i))]
+    return flask.render_template("home.html", folders=folders, notes=notes)
+
+@app.route('/notes/<path:path>')
+def folder(path):
+    "Folder page."
+    raise NotImplementedError
+    root = settings["NOTES_ROOT"]
+    items = sorted(os.listdir(root))
+    folders = [i for i in items if os.path.isdir(os.path.join(root, i))]
+    notes = [os.path.splitext(i)[0] for i in items 
+             if os.path.isfile(os.path.join(root, i))]
+    return flask.render_template("home.html", folders=folders, notes=notes)
+
+@app.route('/notes/<path:path>')
+def note(path):
+    "Note page."
+    raise NotImplementedError
 
 @app.route('/create', methods=["GET", "POST"])
 def create():
