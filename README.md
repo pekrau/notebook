@@ -1,2 +1,3 @@
 # notes
-Simple app to handle notes
+
+Simple app for personal notes. Optionally publish using GitHub pages.
