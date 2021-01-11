@@ -1,0 +1,35 @@
+{# Form to create a note from scratch. #}
+<form action="{{ url_for('create') }}"
+      method="POST">
+  <div class="mb-3">
+    <label for="title" class="col-form-label">Title</label>
+    <input type="text" name="title" id="title"
+           aria-describedby="titleHelp"
+           class="form-control">
+    <div id="titleHelp" class="form-text">
+      Title of the new note; also used to form the filename of the note on disk.
+    </div>
+  </div>
+  <div class="mb-3">
+    <label for="folder" class="col-form-label">Folder</label>
+    <input type="text" name="folder" id="folder"
+           aria-describedby="folderHelp"
+           class="form-control"
+           value="{{ folder or '' }}">
+    <div id="folderHelp" class="form-text">
+      Folder of the note.
+    </div>
+  </div>
+  <div class="mb-3">
+    <label for="text" class="col-form-label">Text</label>
+    <textarea name="text" id="text" rows="10"
+              aria-describedby="textHelp"
+              class="form-control"></textarea>
+    <div id="textHelp" class="form-text">
+      Text of the note in Markdown format.
+    </div>
+  </div>
+  <div class="mb-3">
+    <button type="submit" class="btn btn-primary px-4">Create</button>
+  </div>
+</form>

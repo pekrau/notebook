@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 import flask
 import marko
@@ -35,7 +35,9 @@ def redirect_error(message, url=None):
     Flash the given message.
     """
     flash_error(message)
-    return flask.redirect(url or referrer_or_home())
+    return flask.redirect(url or 
+                          flask.request.headers.get('referer') or 
+                          flask.url_for('home'))
 
 def flash_error(msg):
     "Flash error message."
@@ -54,6 +56,7 @@ app = flask.Flask(__name__)
 
 settings = dict(VERSION=__version__,
                 SERVER_NAME="127.0.0.1:5099",
+                TEMPLATES_AUTO_RELOAD=True,
                 DEBUG=True,
                 JSON_AS_ASCII=False)
 
@@ -72,13 +75,47 @@ def home():
     "Home page; dashboard."
     return flask.render_template("home.html")
 
+@app.route('/create', methods=["GET", "POST"])
+def create():
+    "Create a note."
+    if flask.request.method == "GET":
+        return flask.render_template("create.html",
+                                     folder=flask.request.form.get("folder"))
+    elif flask.request.method == "POST":
+        title = flask.request.form.get("title") or "No title"
+        title = title.replace("\n", " ")
+        title = title.replace("/", " ")
+        title = title.strip()
+        title = title.lstrip(".")
+        folder = flask.request.form.get("folder") or ""
+        folder = folder.replace("\n", " ")
+        folder = folder.strip()
+        folder = folder.strip("/")
+        text = flask.request.form.get("text") or ""
+        dirpath = os.path.join(settings["NOTES_ROOT"], folder)
+        if not os.path.exists(dirpath):
+            try:
+                os.makedirs(dirpath)
+            except OSError as error:
+                redirect_error(error)
+        filepath = os.path.join(dirpath, f"{title}.md")
+        count = 1
+        while os.path.exists(filepath):
+            count += 1
+            filepath = os.path.join(dirpath, f"{title}{count}.md")
+        try:
+            with open(filepath, "w") as outfile:
+                outfile.write(f"# {title}\n\n{text}")
+        except IOError as error:
+            redirect_error(error)
+        return flask.redirect(flask.url_for('note', title=title))
+
 
 if __name__ == "__main__":
     import sys
     import os
     if len(sys.argv) > 1:
-        dirpath = sys.argv[1]
-        dirpath = os.path.expanduser(dirpath)
+        dirpath = os.path.expanduser(sys.argv[1])
         dirpath = os.path.normpath(dirpath)
     else:
         dirpath = os.path.join(os.getcwd(), "notes")
@@ -92,7 +129,7 @@ if __name__ == "__main__":
             settings.update(json.load(infile))
         settings["SETTINGS_FILEPATH"] = filepath
     except IOError:
-        pass
-    settings["NOTESPATH"] = dirpath
+        settings["SETTINGS_FILEPATH"] = None
+    settings["NOTES_ROOT"] = dirpath
     app.config.from_mapping(settings)
-    app.run()
+    app.run(debug=True)

@@ -33,9 +33,6 @@
             <li class="nav-item">
               <a href="{{ url_for('home') }}" class="nav-link">Home</a>
             </li>
-            <li class="nav-item">
-              <a href="{{ url_for('home') }}" class="nav-link">Home2</a>
-            </li>
           </ul>
           <form action="#"
                 class="d-flex">
@@ -48,8 +45,8 @@
 
     <div class="container-fluid">
       <div class="row">
-        <div class="col-md-9 offset-md-1">
-          <h2 class="my-2">{% block body_title %}notes{% endblock %}</h2>
+        <div class="col-md-8 offset-md-2">
+          <h2 class="my-3">{% block body_title %}notes{% endblock %}</h2>
           {% for msg in get_flashed_messages(category_filter=['error']) %}
           <div class="alert alert-danger" role="alert">
             <strong>Error:</strong> {{ msg }}
@@ -74,11 +71,15 @@
 
       {% block supermain %}
       <div class="row">
-        <div class="col-md">
+        <div class="col-md-2">
+          {% block menu %}
+          {% endblock %}
+        </div>
+        <div class="col-md-8">
           {% block main %}
           {% endblock %}
         </div>
-        <div class="col-md-2 d-print-none">
+        <div class="col-md-2">
           <div>
             {% block actions %}
             {% endblock %}
@@ -92,7 +93,10 @@
       {% block footer %}
       <hr>
       <div class="row">
-        <div class="offset-md-9 col-md-3 text-end">
+        <div class="col-md-9 text-muted">
+          Root directory: {{ config['NOTES_ROOT'] }}
+        </div>
+        <div class="col-md-3 text-end">
           <a href="https://github.com/pekrau/notes"
              class="text-decoration-none">notes {{ config['VERSION'] }}</a>
         </div>
