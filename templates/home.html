@@ -5,17 +5,19 @@
 {% block menu %}
 <ul class="list-group">
   {% for folder in folders %}
-  <a href="{{ url_for('folder', path=folder) }}"
-     class="list-group-item list-group-item-secondary">{{ folder }}</a>
-  {% endfor %}
-  {% for note in notes %}
-  <a href="{{ url_for('note', path=note) }}"
-     class="list-group-item">{{ note }}</a>
+  <a href="{{ url_for('item', path=folder) }}"
+     class="list-group-item list-group-item-primary">{{ folder }}</a>
   {% endfor %}
 </ul>
 {% endblock %} {# block menu #}
 
 {% block main %}
+<ul class="list-group">
+  {% for note in notes %}
+  <a href="{{ url_for('item', path=note) }}"
+     class="list-group-item">{{ note }}</a>
+  {% endfor %}
+</ul>
 {% endblock %} {# block main #}
 
 {% block actions %}

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block head_title %}{{ title }}{% endblock %}
+{% block body_title %}{{ title }}{% endblock %}
+
+{% block menu %}
+<ul class="list-group">
+  <a href="{{ url_for('home') }}"
+     class="list-group-item list-group-item-light"><i>home</i></a>
+  {% for pos, folder in enumerate(path, 1) %}
+  <a href="{{ url_for('item', path=join_path(path[:pos])) }}"
+     class="list-group-item list-group-item-light">{{ folder }}</a>
+  {% endfor %}
+</ul>
+{% endblock %} {# block menu #}
+
+{% block main %}
+{{ text | markdown }}
+{% endblock %} {# block main #}

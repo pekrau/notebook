@@ -46,6 +46,11 @@
 
     <div class="container-fluid">
       <div class="row">
+        <div class="col-md-10 offset-md-2">
+          <h1>{% block body_title %}notes{% endblock %}</h1>
+        </div>
+      </div>
+      <div class="row">
         <div class="col-md-6 offset-md-2">
           {% for msg in get_flashed_messages(category_filter=['error']) %}
           <div class="alert alert-danger" role="alert">
