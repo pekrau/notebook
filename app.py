@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 import copy as copy_module
 import json
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     if not os.path.isdir(dirpath):
         sys.exit(f"'{dirpath}' is not a directory")
     try:
-        filepath = os.path.join(dirpath, "settings.json")
+        filepath = os.path.join(dirpath, ".notes.json")
         with open(filepath) as infile:
             settings.update(json.load(infile))
         settings["SETTINGS_FILEPATH"] = filepath
