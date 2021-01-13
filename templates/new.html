@@ -1,13 +1,12 @@
 {% extends 'base.html' %}
 
-{% block head_title %}Create a note{% endblock %}
+{% block head_title %}Create a new note{% endblock %}
+{% block body_title %}Create a new note{% endblock %}
 
 {% block main %}
-<h2>Create a note</h2>
-
 <div class="card">
   <div class="card-body">
-    <form action="{{ url_for('create') }}"
+    <form action="{{ url_for('new') }}"
           method="POST">
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>
@@ -20,13 +19,13 @@
         </div>
       </div>
       <div class="mb-3">
-        <label for="folder" class="col-form-label">Folder</label>
-        <input type="text" name="folder" id="folder"
-               aria-describedby="folderHelp"
+        <label for="parent" class="col-form-label">Parent</label>
+        <input type="text" name="parent" id="parent"
+               aria-describedby="parentHelp"
                class="form-control"
-               value="{{ folder or '' }}">
-        <div id="folderHelp" class="form-text">
-          Folder of the note. May be a path "folder/subfolder/...".
+               value="{{ parent or '' }}">
+        <div id="parentHelp" class="form-text">
+          Parent of the new note. May be a path "note1/note2/...".
         </div>
       </div>
       <div class="mb-3">

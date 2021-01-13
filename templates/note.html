@@ -1,19 +1,41 @@
 {% extends 'base.html' %}
 
-{% block head_title %}{{ title }}{% endblock %}
-{% block body_title %}{{ title }}{% endblock %}
+{% block head_title %}{{ note['title'] }}{% endblock %}
+{% block body_title %}{{ note['title'] }}{% endblock %}
 
 {% block menu %}
 <ul class="list-group">
   <a href="{{ url_for('home') }}"
      class="list-group-item list-group-item-light"><i>home</i></a>
-  {% for pos, folder in enumerate(path, 1) %}
-  <a href="{{ url_for('item', path=join_path(path[:pos])) }}"
-     class="list-group-item list-group-item-light">{{ folder }}</a>
+  {% for pos, segment in enumerate(segments[:-1], 1) %}
+  <a href="{{ url_for('note', path=join_path(segments[:pos])) }}"
+     class="list-group-item list-group-item-light">{{ segment }}</a>
   {% endfor %}
 </ul>
 {% endblock %} {# block menu #}
 
 {% block main %}
-{{ text | markdown }}
+{{ note['text'] | markdown }}
+
+{% if not note.get('notes') is none %}
+<ul class="list-group">
+  {% for subnote in note['notes'] %}
+  <a href="{{ url_for('note', path=join_path(segments, subnote['title'])) }}"
+     class="list-group-item d-flex justify-content-between align-items-center">
+    {{ subnote['title'] }}
+    {% if not subnote.get('notes') is none %}
+    <span class="badge bg-secondary">{{ len(subnote['notes']) }}</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %} {# block main #}
+
+{% block actions %}
+<div>
+  <form action="{{ url_for('new') }}" method="GET" class="d-grid gap-2">
+    <input type="hidden" name="parent" value="{{ '/'.join(segments) }}">
+    <button type="submit" class="btn btn-primary btn-block">New note</a>
+</div>
+{% endblock %} {# block actions #}

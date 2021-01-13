@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 
 import copy as copy_module
 import json
@@ -67,14 +67,64 @@ def join_path(*args):
             parts.append(str(arg))
     return "/".join(parts)
 
-def read_index(dirpath):
-    with open(os.path.join(dirpath, ".folder.json")) as infile:
-        index = json.load(infile)
-    return index
+def get_index(path):
+    """Return the index file for the directory.
+    If it doesn't exist, create it.
+    """
+    try:
+        with open(os.path.join(path, ".index.json")) as infile:
+            return json.load(infile)
+    except OSError:
+        filenames = os.listdir(path)
+        filenames = [fn for fn in filenames 
+                     if not (fn.startswith(".") or fn.startswith("_"))]
+        filenames = [os.path.splitext(fn)[0] for fn in filenames]
+        index = dict(notes=sorted(filenames))
+        write_index(path, index)
+        return index
 
-def write_index(dirpath, index):
-    with open(os.path.join(dirpath, ".folder.json"), "w") as outfile:
+def write_index(path, index):
+    "Write the index information to a file in the directory."
+    with open(os.path.join(path, ".index.json"), "w") as outfile:
         json.dump(index, outfile)
+
+def get_note(path, level=1):
+    """Get the note at the given path.
+    If any subnotes, provide these as a list of dictionaries.
+    Recursively go down the given number of levels.
+    """
+    if path:
+        dirpath = os.path.join(settings["NOTES_ROOT"], path)
+    else:
+        dirpath = settings["NOTES_ROOT"]
+    result = {"title": path and os.path.basename(path) or None}
+
+    # Is it a directory? Note containing other notes.
+    if os.path.isdir(dirpath):
+        try:
+            with open(os.path.join(dirpath, "_dir.md")) as infile:
+                result["text"] = infile.read()
+        except OSError:
+            result["text"] = ""
+        result["notes"] = []
+        if level >= 0:
+            with open(os.path.join(dirpath, ".index.json")) as infile:
+                index = json.load(infile)
+            for title in index["notes"]:
+                if path:
+                    path2 = os.path.join(path, title)
+                else:
+                    path2 = title
+                result["notes"].append(get_note(path2, level-1))
+
+    # Is it a Markdown file? A single note.
+    else:
+        filepath = os.path.join(settings["NOTES_ROOT"], f"{path}.md")
+        with open(filepath) as infile:
+            result["text"] = infile.read()
+
+    return result
+
 
 app = flask.Flask(__name__)
 
@@ -89,27 +139,27 @@ app.add_template_filter(markdown)
 
 @app.before_first_request
 def setup():
-    "Create or repair folder index files."
+    "Check index files recursively; create or repair."
+    pass
     for dirpath, dirnames, filenames in os.walk(settings["NOTES_ROOT"]):
-        indexfilepath = os.path.join(dirpath, ".folder.json")
         try:
-            index = read_index(dirpath)
+            with open(dirpath) as infile:
+                index = json.load(infile)
             orig_index = copy_module.deepcopy(index)
         except OSError:
-            index = dict(folders=[], notes=[])
+            index = dict(notes=[])
             orig_index = dict() # This will force file update further down.
-        added = set(dirnames).difference(index["folders"])
+        filenames = [fn for fn in filenames 
+                     if not (fn.startswith(".") or fn.startswith("_"))]
+        filenames = [os.path.splitext(fn)[0] for fn in filenames]
+        current = set(dirnames).union(filenames)
+        added = current.difference(index["notes"])
         if added:
-            index["folders"].extend(sorted(added))
-        removed = set(index["folders"]).difference(dirnames)
-        for remove in removed:
-            index["folders"].remove(remove)
-        filenames = [fn for fn in filenames if not fn.startswith(".")]
-        notetitles = [os.path.splitext(fn)[0] for fn in filenames]
-        added = set(notetitles).difference(index["notes"])
-        if added:
+            print("added", added)
             index["notes"].extend(sorted(added))
-        removed = set(index["notes"]).difference(notetitles)
+        removed = set(index["notes"]).difference(current)
+        if removed:
+            print("removed", removed)
         for remove in removed:
             index["notes"].remove(remove)
         if index != orig_index:
@@ -119,6 +169,7 @@ def setup():
 def setup_template_context():
     "Add to the global context of Jinja2 templates."
     return dict(enumerate=enumerate,
+                len=len,
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
@@ -127,122 +178,71 @@ def setup_template_context():
 
 @app.route("/")
 def home():
-    "Home page; dashboard."
-    root = settings["NOTES_ROOT"]
-    index = read_index(root)
-    return flask.render_template("home.html",
-                                 folders=index["folders"],
-                                 notes=index["notes"])
+    "Home page; root note."
+    return flask.render_template("home.html", root=get_note(None, level=1))
 
-@app.route("/notes")
-def root():
-    "Root of notes; redirect to home."
-    return flask.redirect(flask.url_for("home"))
-
-@app.route("/create", methods=["GET", "POST"])
-def create():
-    "Create a note."
+@app.route("/new", methods=["GET", "POST"])
+def new():
+    "Create a new note."
     if flask.request.method == "GET":
-        return flask.render_template("create.html",
-                                     folder=flask.request.form.get("folder"))
+        return flask.render_template("new.html",
+                                     parent=flask.request.values.get("parent"))
+
     elif flask.request.method == "POST":
         title = flask.request.form.get("title") or "No title"
         title = title.replace("\n", " ")
         title = title.replace("/", " ")
         title = title.strip()
         title = title.lstrip(".")
-        folder = flask.request.form.get("folder") or ""
-        folder = folder.replace("\n", " ")
-        folder = folder.strip()
-        folder = folder.strip("/")
+        parent = flask.request.form.get("parent") or ""
+        parent = parent.replace("\n", " ")
+        parent = parent.strip()
+        parent = parent.strip("/")
         text = flask.request.form.get("text") or ""
-        dirpath = os.path.join(settings["NOTES_ROOT"], folder)
+        dirpath = os.path.join(settings["NOTES_ROOT"], parent)
         if not os.path.exists(dirpath):
             try:
                 os.makedirs(dirpath)
             except OSError as error:
                 return redirect_error(error)
+        index = get_index(dirpath)
+        orig_title = title
         filepath = os.path.join(dirpath, f"{title}.md")
         count = 1
         while os.path.exists(filepath):
             count += 1
-            filepath = os.path.join(dirpath, f"{title}-{count}.md")
+            title = f"{orig_title}-{count}"
+            filepath = os.path.join(dirpath, f"{title}.md")
         try:
             with open(filepath, "w") as outfile:
                 outfile.write(text)
         except IOError as error:
             return redirect_error(error)
-        return flask.redirect(flask.url_for('note', title=title))
-
-@app.route("/notes/<path:path>")
-def item(path):
-    "Display page for note or folder."
-    # Is it a directory = folder?
-    dirpath = os.path.join(settings["NOTES_ROOT"], path)
-    if os.path.isdir(dirpath):
-        index = read_index(dirpath)
-        if path:
-            path = path.split("/")
+        index["notes"].append(title)
+        write_index(dirpath, index)
+        if parent:
+            path = os.path.join(parent, title)
         else:
-            path = []
-        return flask.render_template("folder.html",
-                                     path=path,
-                                     folders=index["folders"],
-                                     notes=index["notes"])
-    # Is it a Markdown file = note?
-    filepath = os.path.join(settings["NOTES_ROOT"], f"{path}.md")
-    if os.path.isfile(filepath):
-        try:
-            with open(filepath) as infile:
-                text = infile.read()
-        except OSError as error:
-            return redirect_error(error)
-        path, title = os.path.split(path) # Yes, the original path.
-        if path:
-            path = path.split("/")
-        else:
-            path = []
-        return flask.render_template("note.html",
-                                     path=path,
-                                     title=title,
-                                     text=text)
+            path = title
+        return flask.redirect(flask.url_for('note', path=path))
 
-    return redirect_error("No such folder or note.")
+@app.route("/note")
+def root():
+    "Root note information is shown in the home page."
+    return flask.redirect(flask.url_for("home"))
+
+@app.route("/note/<path:path>")
+def note(path):
+    "Display page for a note."
+    note = get_note(path, level=1)
+    return flask.render_template("note.html", 
+                                 note=note,
+                                 segments=path.split("/"))
 
 @app.route("/edit/<path:path>", methods=["POST"])
 def edit(path):
     "Edit the text of a note."
-    if flask.request.method == "GET":
-        return flask.render_template("create.html",
-                                     folder=flask.request.form.get("folder"))
-    if flask.request.method == "POST":
-        title = flask.request.form.get("title") or "No title"
-        title = title.replace("\n", " ")
-        title = title.replace("/", " ")
-        title = title.strip()
-        title = title.lstrip(".")
-        folder = flask.request.form.get("folder") or ""
-        folder = folder.replace("\n", " ")
-        folder = folder.strip()
-        folder = folder.strip("/")
-        text = flask.request.form.get("text") or ""
-        dirpath = os.path.join(settings["NOTES_ROOT"], folder)
-        if not os.path.exists(dirpath):
-            try:
-                os.makedirs(dirpath)
-            except OSError as error:
-                return redirect_error(error)
-        filepath = os.path.join(dirpath, f"{title}.md")
-        count = 1
-        while os.path.exists(filepath):
-            count += 1
-            filepath = os.path.join(dirpath, f"{title}-{count}.md")
-        try:
-            with open(filepath, "w") as outfile:
-                outfile.write(text)
-        except IOError as error:
-            return redirect_error(error)
-        return flask.redirect(flask.url_for('note', title=title))
+    raise NotImplementedError
 
 
 if __name__ == "__main__":

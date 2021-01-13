@@ -1,28 +1,28 @@
 {% extends 'base.html' %}
 
 {% block head_title %}notes {{ config['NOTES_ROOT'] }}{% endblock %}
-
-{% block menu %}
-<ul class="list-group">
-  {% for folder in folders %}
-  <a href="{{ url_for('item', path=folder) }}"
-     class="list-group-item list-group-item-primary">{{ folder }}</a>
-  {% endfor %}
-</ul>
-{% endblock %} {# block menu #}
+{% block body_title %}
+notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
+{% endblock %}
 
 {% block main %}
+{{ root['text'] | markdown }}
 <ul class="list-group">
-  {% for note in notes %}
-  <a href="{{ url_for('item', path=note) }}"
-     class="list-group-item">{{ note }}</a>
+  {% for note in root['notes'] %}
+  <a href="{{ url_for('note', path=note['title']) }}"
+     class="list-group-item d-flex justify-content-between align-items-center">
+    {{ note['title'] }}
+    {% if not note.get('notes') is none %}
+    <span class="badge bg-secondary ms-2">{{ len(note['notes']) }}</span>
+    {% endif %}
+  </a>
   {% endfor %}
 </ul>
 {% endblock %} {# block main #}
 
 {% block actions %}
 <div class="d-grid gap-2">
-  <a href="{{ url_for('create') }}"
-     role="button" class="btn btn-primary btn-block">Create a note</a>
+  <a href="{{ url_for('new') }}"
+     role="button" class="btn btn-primary btn-block">New note</a>
 </div>
 {% endblock %} {# block actions #}
