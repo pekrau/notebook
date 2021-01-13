@@ -46,7 +46,22 @@
 
     <div class="container-fluid">
       <div class="row">
-        <div class="col-md-10 offset-md-2">
+        {% block new %}
+        {% if interactive %}
+        <div class="col-md-2 align-self-center">
+          <form action="{{ url_for('new') }}" method="GET" class="d-grid gap-2">
+            {% if segments %}
+            <input type="hidden" name="parent" value="{{ '/'.join(segments) }}">
+            {% endif %}
+            <button type="submit"
+                    class="btn btn-primary btn-block">New note</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="col-md-2"></div>
+        {% endif %} {# if interactive #}
+        {% endblock %} {# block new #}
+        <div class="col-md-10">
           <h1>{% block body_title %}notes{% endblock %}</h1>
         </div>
       </div>

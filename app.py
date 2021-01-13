@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 import copy as copy_module
 import json
@@ -168,7 +168,8 @@ def setup():
 @app.context_processor
 def setup_template_context():
     "Add to the global context of Jinja2 templates."
-    return dict(enumerate=enumerate,
+    return dict(interactive=True,
+                enumerate=enumerate,
                 len=len,
                 flash_error=flash_error,
                 flash_warning=flash_warning,

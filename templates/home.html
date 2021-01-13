@@ -19,10 +19,3 @@ notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
   {% endfor %}
 </ul>
 {% endblock %} {# block main #}
-
-{% block actions %}
-<div class="d-grid gap-2">
-  <a href="{{ url_for('new') }}"
-     role="button" class="btn btn-primary btn-block">New note</a>
-</div>
-{% endblock %} {# block actions #}
