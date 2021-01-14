@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 import copy as copy_module
 import json
@@ -45,17 +45,11 @@ def redirect_error(message, url=None):
                           flask.request.headers.get('referer') or 
                           flask.url_for('home'))
 
-def flash_error(msg):
-    "Flash error message."
-    flask.flash(str(msg), "error")
+def flash_error(msg): flask.flash(str(msg), "error")
 
-def flash_warning(msg):
-    "Flash warning message."
-    flask.flash(str(msg), "warning")
+def flash_warning(msg): flask.flash(str(msg), "warning")
 
-def flash_message(msg):
-    "Flash information message."
-    flask.flash(str(msg), "message")
+def flash_message(msg): flask.flash(str(msg), "message")
 
 def join_path(*args):
     "Join together arguments (strings or lists of strings) into a path."
@@ -67,26 +61,29 @@ def join_path(*args):
             parts.append(str(arg))
     return "/".join(parts)
 
-def get_index(path):
-    """Return the index file for the directory.
-    If it doesn't exist, create it.
-    """
-    try:
-        with open(os.path.join(path, ".index.json")) as infile:
-            return json.load(infile)
-    except OSError:
-        filenames = os.listdir(path)
-        filenames = [fn for fn in filenames 
-                     if not (fn.startswith(".") or fn.startswith("_"))]
-        filenames = [os.path.splitext(fn)[0] for fn in filenames]
-        index = dict(notes=sorted(filenames))
-        write_index(path, index)
-        return index
+def get_index(dirpath):
+    "Return the index file for the directory."
+    with open(os.path.join(dirpath, ".index.json")) as infile:
+        return json.load(infile)
 
-def write_index(path, index):
+def write_index(dirpath, index):
     "Write the index information to a file in the directory."
-    with open(os.path.join(path, ".index.json"), "w") as outfile:
+    with open(os.path.join(dirpath, ".index.json"), "w") as outfile:
         json.dump(index, outfile)
+
+def make_index(dirpath):
+    "Create an index file for the directory if it does not exist."
+    if os.path.exists(os.path.join(dirpath, ".index.json")):
+        return False
+    else:
+        notes = []
+        for name in os.listdir(dirpath):
+            if os.path.isdir(os.path.join(dirpath, name)):
+                notes.append(name)
+            elif not (name.startswith(".") or name.startswith("_")):
+                notes.append(os.path.splitext(name)[0])
+        write_index(dirpath, {"notes": notes})
+        return True
 
 def get_note(path, level=1):
     """Get the note at the given path.
@@ -102,14 +99,13 @@ def get_note(path, level=1):
     # Is it a directory? Note containing other notes.
     if os.path.isdir(dirpath):
         try:
-            with open(os.path.join(dirpath, "_dir.md")) as infile:
+            with open(os.path.join(dirpath, "__dir__.md")) as infile:
                 result["text"] = infile.read()
         except OSError:
             result["text"] = ""
         result["notes"] = []
         if level >= 0:
-            with open(os.path.join(dirpath, ".index.json")) as infile:
-                index = json.load(infile)
+            index = get_index(dirpath)
             for title in index["notes"]:
                 if path:
                     path2 = os.path.join(path, title)
@@ -143,14 +139,14 @@ def setup():
     pass
     for dirpath, dirnames, filenames in os.walk(settings["NOTES_ROOT"]):
         try:
-            with open(dirpath) as infile:
-                index = json.load(infile)
+            index = get_index(dirpath)
             orig_index = copy_module.deepcopy(index)
         except OSError:
             index = dict(notes=[])
             orig_index = dict() # This will force file update further down.
-        filenames = [fn for fn in filenames 
-                     if not (fn.startswith(".") or fn.startswith("_"))]
+        filenames = [fn for fn in filenames if not (fn.startswith(".") or
+                                                    fn.startswith("_") or
+                                                    fn.endswith("~"))]
         filenames = [os.path.splitext(fn)[0] for fn in filenames]
         current = set(dirnames).union(filenames)
         added = current.difference(index["notes"])
@@ -191,21 +187,38 @@ def new():
 
     elif flask.request.method == "POST":
         title = flask.request.form.get("title") or "No title"
+        # Clean up title.
         title = title.replace("\n", " ")
         title = title.replace("/", " ")
         title = title.strip()
         title = title.lstrip(".")
+        title = title.lstrip("_")
+        # Clean up parent path.
         parent = flask.request.form.get("parent") or ""
         parent = parent.replace("\n", " ")
         parent = parent.strip()
         parent = parent.strip("/")
         text = flask.request.form.get("text") or ""
         dirpath = os.path.join(settings["NOTES_ROOT"], parent)
+        # Create directory(ies) that do not exist.
         if not os.path.exists(dirpath):
             try:
                 os.makedirs(dirpath)
             except OSError as error:
                 return redirect_error(error)
+            else:
+                # Move any note file down into its created directory.
+                dirpath2 = dirpath
+                while dirpath2 != settings["NOTES_ROOT"]:
+                    filepath = f"{dirpath2}.md"
+                    if os.path.isfile(filepath):
+                        print("rename", filepath, os.path.join(dirpath2,"__dir__.md"))
+                        os.rename(filepath, os.path.join(dirpath2,"__dir__.md"))
+                        break
+                    dirpath2 = os.path.dirname(dirpath2)
+                dirpath2 = dirpath
+                while make_index(dirpath2):
+                    dirpath2 = os.path.dirname(dirpath2)
         index = get_index(dirpath)
         orig_title = title
         filepath = os.path.join(dirpath, f"{title}.md")
