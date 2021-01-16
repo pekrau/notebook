@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block head_title %}Edit note '{{ note["title"] }}'{% endblock %}
+{% block body_title %}Edit note '{{ note["title"] }}'{% endblock %}
+
+{% block new %}
+<div class="col-md-2"></div>
+{% endblock %}
+
+{% block main %}
+<div class="card">
+  <div class="card-body">
+    <form action="{{ url_for('edit', path=note['path']) }}"
+          method="POST">
+      <div class="mb-3">
+        <label for="text" class="col-form-label">Text</label>
+        <textarea name="text" id="text" rows="10"
+                  aria-describedby="textHelp"
+                  class="form-control">{{ note['text'] or ''}}</textarea>
+        <div id="textHelp" class="form-text">
+          Text of the note in Markdown format.
+        </div>
+      </div>
+      <div class="mb-3">
+        <button type="submit" class="btn btn-primary px-5">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {# block main #}
+
+{% block actions %}
+<div class="d-grid gap-2">
+  <a href="{{ url_for('note', path=note['path']) }}"
+     class="btn btn-secondary">Cancel</a>
+</div>
+{% endblock %} {# block actions #}

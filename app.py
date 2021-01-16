@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.0.9"
+__version__ = "0.1.0"
 
 import copy as copy_module
 import json
@@ -94,7 +94,8 @@ def get_note(path, level=1):
         dirpath = os.path.join(settings["NOTES_ROOT"], path)
     else:
         dirpath = settings["NOTES_ROOT"]
-    result = {"title": path and os.path.basename(path) or None}
+    result = {"path": path,
+              "title": path and os.path.basename(path) or None}
 
     # Is it a directory? Note containing other notes.
     if os.path.isdir(dirpath):
@@ -212,7 +213,6 @@ def new():
                 while dirpath2 != settings["NOTES_ROOT"]:
                     filepath = f"{dirpath2}.md"
                     if os.path.isfile(filepath):
-                        print("rename", filepath, os.path.join(dirpath2,"__dir__.md"))
                         os.rename(filepath, os.path.join(dirpath2,"__dir__.md"))
                         break
                     dirpath2 = os.path.dirname(dirpath2)
@@ -253,10 +253,22 @@ def note(path):
                                  note=note,
                                  segments=path.split("/"))
 
-@app.route("/edit/<path:path>", methods=["POST"])
+@app.route("/edit/<path:path>", methods=["GET", "POST"])
 def edit(path):
     "Edit the text of a note."
-    raise NotImplementedError
+    note = get_note(path, level=0)
+    if flask.request.method == "GET":
+        return flask.render_template("edit.html", note=note)
+
+    elif flask.request.method == "POST":
+        dirpath = os.path.join(settings["NOTES_ROOT"], path)
+        if os.path.isdir(dirpath):
+            with open(os.path.join(dirpath, "__dir__.md"), "w") as outfile:
+                outfile.write(flask.request.form.get("text") or '')
+        else:
+            with open(f"{dirpath}.md", "w") as outfile:
+                outfile.write(flask.request.form.get("text") or '')
+        return flask.redirect(flask.url_for("note", path=path))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import 'macros.html' as macros with context %}
 
 {% block head_title %}notes {{ config['NOTES_ROOT'] }}{% endblock %}
 {% block body_title %}
@@ -7,15 +8,5 @@ notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
 
 {% block main %}
 {{ root['text'] | markdown }}
-<ul class="list-group">
-  {% for note in root['notes'] %}
-  <a href="{{ url_for('note', path=note['title']) }}"
-     class="list-group-item d-flex justify-content-between align-items-center">
-    {{ note['title'] }}
-    {% if not note.get('notes') is none %}
-    <span class="badge bg-secondary ms-2">{{ len(note['notes']) }}</span>
-    {% endif %}
-  </a>
-  {% endfor %}
-</ul>
+{{ macros.noteslist(root.get('notes')) }}
 {% endblock %} {# block main #}

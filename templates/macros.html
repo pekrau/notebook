@@ -1,0 +1,26 @@
+{% macro noteslist(notes) %}
+{% if not notes is none %}
+<ul class="list-group">
+  {% for note in notes %}
+  <div class="list-group-item d-flex justify-content-between align-items-center">
+    <table>
+      <tr>
+        <td>
+          <a href="#">
+            <span class="bi-caret-down me-2"></span>
+          </a>
+        </td>
+        <td>
+          <a href="{{ url_for('note', path=join_path(segments, note['title'])) }}"
+             class="text-decoration-none">{{ note['title'] }}</a>
+        </td>
+      </tr>
+    </table>
+    {% if not note.get('notes') is none %}
+    <span class="badge bg-secondary">{{ len(note['notes']) }}</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}

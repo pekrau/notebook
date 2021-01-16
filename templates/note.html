@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% import 'macros.html' as macros with context %}
 
 {% block head_title %}{{ note['title'] }}{% endblock %}
 {% block body_title %}{{ note['title'] }}{% endblock %}
@@ -16,18 +17,12 @@
 
 {% block main %}
 {{ note['text'] | markdown }}
-
-{% if not note.get('notes') is none %}
-<ul class="list-group">
-  {% for subnote in note['notes'] %}
-  <a href="{{ url_for('note', path=join_path(segments, subnote['title'])) }}"
-     class="list-group-item d-flex justify-content-between align-items-center">
-    {{ subnote['title'] }}
-    {% if not subnote.get('notes') is none %}
-    <span class="badge bg-secondary">{{ len(subnote['notes']) }}</span>
-    {% endif %}
-  </a>
-  {% endfor %}
-</ul>
-{% endif %}
+{{ macros.noteslist(note.get('notes')) }}
 {% endblock %} {# block main #}
+
+{% block actions %}
+<div class="d-grid gap-2">
+  <a href="{{ url_for('edit', path=note['path']) }}"
+     class="btn btn-primary">Edit</a>
+</div>
+{% endblock %}
