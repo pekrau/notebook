@@ -10,15 +10,15 @@
 {% block main %}
 <div class="card">
   <div class="card-body">
-    <form action="{{ url_for('new') }}"
+    <form action="{{ url_for('create') }}"
           method="POST">
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>
-        <input type="text" name="title" id="title"
+        <input type="text" name="title" id="title" autofocus
                aria-describedby="titleHelp"
                class="form-control">
         <div id="titleHelp" class="form-text">
-          Title of the note; also used for the filename of the note on
+          Title of the new note; also used for the filename of the note on
           disk.
         </div>
       </div>
@@ -27,7 +27,7 @@
         <input type="text" name="parent" id="parent"
                aria-describedby="parentHelp"
                class="form-control"
-               value="{{ parent or '' }}">
+               value="{{ parent }}">
         <div id="parentHelp" class="form-text">
           Parent of the new note. May be a path "note1/note2/...".
         </div>
@@ -38,7 +38,7 @@
                   aria-describedby="textHelp"
                   class="form-control"></textarea>
         <div id="textHelp" class="form-text">
-          Text of the note in Markdown format.
+          Text of the new note in Markdown format.
         </div>
       </div>
       <div class="mb-3">

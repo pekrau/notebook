@@ -13,10 +13,17 @@
     <form action="{{ url_for('edit', path=note['path']) }}"
           method="POST">
       <div class="mb-3">
+        <label for="title" class="col-form-label">Title</label>
+        <input type="text" name="title" id="title"
+               aria-describedby="titleHelp"
+               class="form-control"
+               value="{{ note['title'] }}">
+      </div>
+      <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
-        <textarea name="text" id="text" rows="10"
+        <textarea name="text" id="text" rows="10" autofocus
                   aria-describedby="textHelp"
-                  class="form-control">{{ note['text'] or ''}}</textarea>
+                  class="form-control">{{ note['text'] or '' }}</textarea>
         <div id="textHelp" class="form-text">
           Text of the note in Markdown format.
         </div>

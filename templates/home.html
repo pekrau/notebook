@@ -10,3 +10,11 @@ notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
 {{ root['text'] | markdown }}
 {{ macros.noteslist(root.get('notes')) }}
 {% endblock %} {# block main #}
+
+{% block actions %}
+{% if interactive %}
+<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2">
+  <button type="submit" class="btn btn-success">Create</button>
+</form>
+{% endif %} {# if interactive #}
+{% endblock %}

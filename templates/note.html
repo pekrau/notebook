@@ -21,8 +21,25 @@
 {% endblock %} {# block main #}
 
 {% block actions %}
-<div class="d-grid gap-2">
+{% if interactive %}
+<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2">
+  {% if segments %}
+  <input type="hidden" name="parent" value="{{ '/'.join(segments) }}">
+  {% endif %}
+  <button type="submit" class="btn btn-success">Create</button>
+</form>
+<div class="d-grid gap-2 mt-2">
   <a href="{{ url_for('edit', path=note['path']) }}"
      class="btn btn-primary">Edit</a>
 </div>
+<div>
+  <form action="{{ url_for('delete', path=note['path']) }}"
+        method="POST"
+        class="d-grid gap-2 mt-2">
+    <button role="submit" class="btn btn-danger"
+            onclick="return confirm('Really delete recursively? Cannot be undone.')"
+            >Delete</button>
+  </form>
+</div>
+{% endif %} {# if interactive #}
 {% endblock %}
