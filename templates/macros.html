@@ -2,23 +2,33 @@
 {% if not notes is none %}
 <ul class="list-group">
   {% for note in notes %}
+  {% set id = join_path(note['path'], note['title'], idify=True) %}
   <div class="list-group-item d-flex justify-content-between align-items-center">
-    <table>
-      <tr>
-        <td>
-          <a href="#">
-            <span class="bi-caret-down me-2"></span>
-          </a>
-        </td>
-        <td>
-          <a href="{{ url_for('note', path=join_path(segments, note['title'])) }}"
-             class="text-decoration-none">{{ note['title'] }}</a>
-        </td>
-      </tr>
+    <table width="100%">
+      <tbody>
+        <tr class="align-top">
+          <td width="5%" class="pe-3">
+            <button class="btn btn-sm btn-outline-primary" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#{{ id }}"
+                    aria-expanded="false" aria-controls="{{ id }}">
+              <span class="bi-caret-down"></span>
+            </button>
+          </td>
+          <td class="text-start">
+            <a href="{{ url_for('note', path=join_path(segments, note['title'])) }}"
+               class="text-decoration-none">{{ note['title'] }}</a>
+            <div class="collapse" id="{{ id }}">
+              {{ note['text'] | markdown }}
+            </div>
+          </td>
+          <td class="text-end">
+            {% if not note.get('notes') is none %}
+            <span class="badge bg-secondary">{{ len(note['notes']) }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      </tbody>
     </table>
-    {% if not note.get('notes') is none %}
-    <span class="badge bg-secondary">{{ len(note['notes']) }}</span>
-    {% endif %}
   </div>
   {% endfor %}
 </ul>

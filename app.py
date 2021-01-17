@@ -1,15 +1,16 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
+import base64
 import copy as copy_module
 import json
 import os
+import urllib.parse
 
 import flask
 import marko
 import jinja2.utils
-
 
 class HtmlRenderer(marko.html_renderer.HTMLRenderer):
     """Extension of HTML renderer to allow setting <a> attribute '_target'
@@ -42,8 +43,8 @@ def redirect_error(message, url=None):
     """
     flash_error(message)
     return flask.redirect(url or 
-                          flask.request.headers.get('referer') or 
-                          flask.url_for('home'))
+                          flask.request.headers.get("referer") or 
+                          flask.url_for("home"))
 
 def flash_error(msg): flask.flash(str(msg), "error")
 
@@ -51,15 +52,25 @@ def flash_warning(msg): flask.flash(str(msg), "warning")
 
 def flash_message(msg): flask.flash(str(msg), "message")
 
-def join_path(*args):
-    "Join together arguments (strings or lists of strings) into a path."
+def join_path(*args, idify=False):
+    """Join together arguments (strings or lists of strings) into a path.
+    Optionally convert it into a valid id for HTML code.
+    """
     parts = []
     for arg in args:
         if isinstance(arg, list):
             parts.extend(arg)
         else:
             parts.append(str(arg))
-    return "/".join(parts)
+    path = "/".join(parts)
+    if idify:
+        path = path.replace("/", "-").replace(" ", "_")
+    return path
+
+def write_note(dirpath, title, text):
+    "Write the note text to a file named by the dirpath and title."
+    with open(os.path.join(dirpath, f"{title}.md"), "w") as outfile:
+        outfile.write(text)
 
 def get_index(dirpath):
     "Return the index file for the directory."
@@ -91,6 +102,7 @@ def get_note(path, level=1):
     Recursively go down the given number of levels.
     """
     if path:
+        path = urllib.parse.unquote(path)
         dirpath = os.path.join(settings["NOTES_ROOT"], path)
     else:
         dirpath = settings["NOTES_ROOT"]
@@ -179,6 +191,14 @@ def home():
     "Home page; root note."
     return flask.render_template("home.html", root=get_note(None, level=1))
 
+@app.route('/icon')
+def icon():
+    "Return the PNG icon for the app."
+    return flask.make_response((ICON, {"Content-Type": "image/png"}))
+
+# Base64-encoded PNG 32x32 image.
+ICON = base64.b64decode(b"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAACBAAAAgQAHitCyxAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAgJJREFUWIW917trFEEcwPFPvOQkOUURLbTyhaCIESxsQxSxESxSqJ2FNlpY+wdYpxFRrNQu4PuBbzEi2AlKjKJgVJBosLAQRC+x2FlyiXt7u3t7+cEwO8/vd2Zv53ZZuFiOUbzDhriyK+T7cAJrC05exzHcb9K+DHexM5S/YAAfYAgzJaSTKYI3EvpPYF0XXqIf13Ep+6LnxC/cw58m7dvwECvn1Y8Jg2awoyC8WSzFMGqh3I8pc3fhhYZCf4nwGh6HeUexJEFiHKs7IdDXAI/T0waJ7XiONfGAMgVqeCL5R/oAvUmDyhLow6Mm8Did65RAr2iFafCPmpwz7Qosxs2i8HYFqpIPmf8OnLRJigqUAi8qUMW1FvBPWJ9lsrwCVVxtAf+s4R9vXmzFeWwpItCDKxngG1PmOB36DcOiDNA4KriA/Sl9JrEH71P6dIe8J49ABRdxoAV8EG8yzimrQLzygyl9vgX4WB54VoFTOJTSPil6u8kNzyLQjcMp7d+xW85tzyMwiFUp8F14XRSeRWCoSf1UgL9qB95KoCL5kZsQbXvbcGafyaQYMLv9P3ALI7iDv2XAWwn8xhlcFr1i1cuCZhV4FlJHI89R3DGB6YbrhYhKyKeJbsFbbMZxnNWhex1iBfaG6/G48ohyvg3zpK9BBtEX8lHRWV7vMPgnbmNTDP8HkTP9qMo5nowAAAAASUVORK5CYII=")
+
 @app.route("/new", methods=["GET", "POST"])
 def new():
     "Create a new note."
@@ -219,21 +239,18 @@ def new():
                 dirpath2 = dirpath
                 while make_index(dirpath2):
                     dirpath2 = os.path.dirname(dirpath2)
-        index = get_index(dirpath)
         orig_title = title
-        filepath = os.path.join(dirpath, f"{title}.md")
         count = 1
-        while os.path.exists(filepath):
+        while os.path.exists(os.path.join(dirpath, f"{title}.md")):
             count += 1
             title = f"{orig_title}-{count}"
-            filepath = os.path.join(dirpath, f"{title}.md")
+        index = get_index(dirpath)
         try:
-            with open(filepath, "w") as outfile:
-                outfile.write(text)
-        except IOError as error:
+            write_note(dirpath, title, text)
+            index["notes"].append(title)
+            write_index(dirpath, index)
+        except OSError as error:
             return redirect_error(error)
-        index["notes"].append(title)
-        write_index(dirpath, index)
         if parent:
             path = os.path.join(parent, title)
         else:
@@ -263,11 +280,10 @@ def edit(path):
     elif flask.request.method == "POST":
         dirpath = os.path.join(settings["NOTES_ROOT"], path)
         if os.path.isdir(dirpath):
-            with open(os.path.join(dirpath, "__dir__.md"), "w") as outfile:
-                outfile.write(flask.request.form.get("text") or '')
+            title = "__dir__"
         else:
-            with open(f"{dirpath}.md", "w") as outfile:
-                outfile.write(flask.request.form.get("text") or '')
+            dirpath, title = os.path.split(dirpath)
+        write_note(dirpath, title, flask.request.form.get("text") or '')
         return flask.redirect(flask.url_for("note", path=path))
 
 
@@ -287,7 +303,7 @@ if __name__ == "__main__":
         with open(filepath) as infile:
             settings.update(json.load(infile))
         settings["SETTINGS_FILEPATH"] = filepath
-    except IOError:
+    except OSError:
         settings["SETTINGS_FILEPATH"] = None
     settings["NOTES_ROOT"] = dirpath
     app.config.from_mapping(settings)
