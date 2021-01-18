@@ -1,29 +1,37 @@
-{% macro noteslist(notes) %}
-{% if not notes is none %}
+{% macro noteslist(notes, level) %}
+{% if notes and level > 0 %}
 <ul class="list-group">
   {% for note in notes %}
-  {% set id = join_path(note['path'], note['title'], idify=True) %}
+  {% set idpath = note.idpath %}
   <div class="list-group-item d-flex justify-content-between align-items-center">
     <table width="100%">
       <tbody>
         <tr class="align-top">
           <td width="5%" class="pe-3">
             <button class="btn btn-sm btn-outline-primary" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#{{ id }}"
-                    aria-expanded="false" aria-controls="{{ id }}">
+                    data-bs-toggle="collapse" data-bs-target="#{{ idpath }}"
+                    aria-expanded="false" aria-controls="{{ idpath }}">
               <span class="bi-caret-down"></span>
             </button>
           </td>
           <td class="text-start">
-            <a href="{{ url_for('note', path=join_path(segments, note['title'])) }}"
-               class="text-decoration-none">{{ note['title'] }}</a>
-            <div class="collapse" id="{{ id }}">
-              {{ note['text'] | markdown }}
-            </div>
+            <a href="{{ url_for('note', path=note.path) }}"
+               class="text-decoration-none">{{ note.title }}</a>
           </td>
           <td class="text-end">
-            {% if not note.get('notes') is none %}
-            <span class="badge bg-secondary">{{ len(note['notes']) }}</span>
+            {% if note.subnotes %}
+            <span class="badge bg-secondary">{{ note.count }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr class="collapse" id="{{ idpath }}">
+          <td></td>
+          <td colspan="2">
+            {{ note.text | markdown }}
+            {% if note.subnotes %}
+            <div>
+              {{ noteslist(note.subnotes, level-1) }}
+            </div>
             {% endif %}
           </td>
         </tr>

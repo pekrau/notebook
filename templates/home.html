@@ -7,8 +7,8 @@ notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
 {% endblock %}
 
 {% block main %}
-{{ root['text'] | markdown }}
-{{ macros.noteslist(root.get('notes')) }}
+{{ root.text | markdown }}
+{{ macros.noteslist(root.subnotes, 2) }}
 {% endblock %} {# block main #}
 
 {% block actions %}
