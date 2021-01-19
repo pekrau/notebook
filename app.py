@@ -1,12 +1,10 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import copy as copy_module
 import json
 import os
-# import shutil
-# import urllib.parse
 
 import flask
 import marko
@@ -15,31 +13,90 @@ import jinja2.utils
 
 SETTINGS = dict(VERSION=__version__,
                 SERVER_NAME="127.0.0.1:5099",
-                SECRET_KEY="this is a secret",
+                SECRET_KEY="this is a secret key",
                 TEMPLATES_AUTO_RELOAD=True,
                 DEBUG=True,
                 JSON_AS_ASCII=False,
-                NOTES_ROOT="notes")
-
-NOTE = None
-LOOKUP = dict()
+                NOTES_DIRPATH="notes")
 
 
 class Note:
     "Note and its subnotes, if any."
 
-    def __init__(self, parent, title):
-        self.parent = parent
-        self.title = title
-        self.text = ""
+    def __init__(self, supernote, title, text=""):
+        self.supernote = supernote
+        if supernote:
+            supernote.subnotes.append(self)
         self.subnotes = []
+        self._title = title
+        self._text = text
+
+    def __repr__(self):
+        return self.path
+
+    def get_title(self):
+        return self._title
+
+    def set_title(self, title):
+        """Set a new title.
+        Raise ValueError if the title is invalid; bad start or end characters.
+        Raise KeyError if there is already a note with that title
+        """
+        # XXX update lookup for this and all subnotes
+        # XXX update links
+        if not self.supernote: return  # Root note has no title to change.
+        title = title.strip()
+        if not title: raise ValueError
+        if "/" in title: raise ValueError
+        if title[0] == ".": raise ValueError
+        if title[0] == "_": raise ValueError
+        if title[-1] == "~": raise ValueError
+        if self._title == title: return
+        new_abspath = os.path.join(SETTINGS["NOTES_DIRPATH"],
+                                   self.supernote.path,
+                                   title)
+        if os.path.exists(new_abspath): raise KeyError
+        if os.path.exists(f"{new_abspath}.md"): raise KeyError
+        # Remove this note and below from lookup while old path.
+        for note in self.traverse():
+            note.remove()
+        # Old abspath needed for renaming directory/file.
+        old_abspath = self.abspath
+        # Actually change the title of the note.
+        self._title = title
+        if os.path.isdir(old_abspath):
+            os.rename(old_abspath, self.abspath)  # New abspath
+        else:
+            os.rename(f"{old_abspath}.md", f"{self.abspath}.md")
+        # Add this note and below to lookup with new path.
+        for note in self.traverse():
+            note.add()
+
+    title = property(get_title, set_title, doc="The title of the note.")
+
+    def get_text(self):
+        return self._text
+
+    def set_text(self, text):
+        # XXX update links etc
+        self._text = text
+        abspath = self.abspath
+        if os.path.isdir(abspath):
+            with open(os.path.join(abspath, "__dir__.md"), "w") as outfile:
+                outfile.write(text)
+        else:
+            with open(f"{abspath}.md", "w") as outfile:
+                outfile.write(text)
+
+    text = property(get_text, set_text,
+                    doc="The Markdown-formatted text of the note.")
 
     @property
     def path(self):
         "Return the path of the note."
-        if self.parent:
+        if self.supernote:
             assert self.title
-            return os.path.join(self.parent, self.title)
+            return os.path.join(self.supernote.path, self.title)
         else:
             return self.title or ""
 
@@ -53,24 +110,43 @@ class Note:
         "Return the absolute filepath of the note."
         path = self.path
         if path:
-            return  os.path.join(SETTINGS["NOTES_ROOT"], path)
+            return  os.path.join(SETTINGS["NOTES_DIRPATH"], path)
         else:
-            return SETTINGS["NOTES_ROOT"]
+            return SETTINGS["NOTES_DIRPATH"]
 
     @property
-    def parents(self):
-        "Return a list of parents and their paths."
-        result = []
-        path = os.path.dirname(self.path)
-        while path:
-            parent, title = os.path.split(path)
-            result.append((title, path))
-            path = parent
-        return reversed(result)
+    def url(self):
+        if self.path:
+            return flask.url_for("note", path=self.path)
+        else:
+            return flask.url_for("home")
+
+    @property
+    def supernotes(self):
+        "Return the list of supernotes."
+        if self.supernote:
+            return self.supernote.supernotes + [self.supernote]
+        else:
+            return []
 
     @property
     def count(self):
+        "Return the number of subnotes."
         return len(self.subnotes)
+
+    def traverse(self):
+        yield self
+        for subnote in self.subnotes:
+            yield from subnote.traverse()
+
+    def write(self):
+        "Write this note to disk. Does NOT write subnotes."
+        if os.path.isdir(self.abspath):
+            with open(os.path.join(self.abspath, "__dir__.md"), "w") as outfile:
+                outfile.write(self.text)
+        else:
+            with open(f"{self.abspath}.md", "w") as outfile:
+                outfile.write(self.text)
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -82,30 +158,51 @@ class Note:
                     self.text = infile.read()
             except OSError:
                 self.text = ""
-            for name in sorted(os.listdir(abspath)):
-                if name.startswith("_"): continue
-                if name.endswith("~"): continue
-                note = Note(self.path, os.path.splitext(name)[0])
-                self.subnotes.append(note)
+            for filename in sorted(os.listdir(abspath)):
+                if filename.startswith("."): continue
+                if filename.startswith("_"): continue
+                if filename.endswith("~"): continue
+                note = Note(self, os.path.splitext(filename)[0])
                 note.read()
         else:
             # It's a file; no subnotes.
             with open(f"{abspath}.md") as infile:
                 self.text = infile.read()
 
-    def build(self):
-        "Build the lookup."
+    def add(self):
+        "Add the note to the lookup."
         LOOKUP[self.path] = self
-        for note in self.subnotes:
-            note.build()
+
+    def remove(self, path=None):
+        "Remove the note from the lookup."
+        LOOKUP.pop(path or self.path)
+
+    def create_subnote(self, title, text):
+        "Create and return a subnote."
+        if title in self.subnotes:
+            raise ValueError(f"Note already exists: '{title}'")
+        if os.path.isfile(f"{self.abspath}.md"):
+            os.mkdir(self.abspath)
+            os.rename(f"{self.abspath}.md",
+                      os.path.join(self.abspath, "__dir__.md"))
+        note = Note(self, title, text)
+        self.subnotes.sort(key=lambda n: n.title)
+        note.write()
+        note.add()
+        return note
 
     def get_tree(self):
         "Get the note contents as a dict."
-        return {"parent": self.parent,
-                "title": self.title,
-                "path": self.path,
-                "text": self.text,
-                "subnotes": [s.get_tree() for s in self.subnotes]}
+        result = {"title": self.title,
+                  "path": self.path,
+                  "text": self.text,
+                  "subnotes": [s.get_tree() for s in self.subnotes]}
+        if self.supernote:
+            result["supernote"] = self.supernote.path
+        return result
+
+ROOT = Note(None, None)
+LOOKUP = dict()
 
 
 class HtmlRenderer(marko.html_renderer.HTMLRenderer):
@@ -133,15 +230,6 @@ def markdown(value):
     processor = marko.Markdown(renderer=HtmlRenderer)
     return jinja2.utils.Markup(processor.convert(value or ""))
 
-def redirect_error(message, url=None):
-    """"Return redirect response to the given URL, or referrer, or home page.
-    Flash the given message.
-    """
-    flash_error(message)
-    return flask.redirect(url or 
-                          flask.request.headers.get("referer") or 
-                          flask.url_for("home"))
-
 def flash_error(msg): flask.flash(str(msg), "error")
 
 def flash_warning(msg): flask.flash(str(msg), "warning")
@@ -157,12 +245,13 @@ DB = dict()
 
 @app.before_first_request
 def setup():
-    "Read all notes and keep in memory. Set up links and indexes."
-    global NOTE
-    NOTE = Note(None, None)
-    NOTE.read()
-    NOTE.build()
-    print(json.dumps(NOTE.get_tree(), indent=2))
+    "Read all notes and keep in memory. Set up lookup."
+    # XXX links
+    ROOT.read()
+    for note in ROOT.traverse():
+        note.add()
+    print(json.dumps(ROOT.get_tree(), indent=2))
+    print(list(ROOT.traverse()))
 
 @app.context_processor
 def setup_template_context():
@@ -170,41 +259,54 @@ def setup_template_context():
     return dict(interactive=True,
                 flash_error=flash_error,
                 flash_warning=flash_warning,
-                flash_message=flash_message,
-                redirect_error=redirect_error)
+                flash_message=flash_message)
 
 @app.route("/")
 def home():
     "Home page; root note."
-    return flask.render_template("home.html", root=NOTE)
+    return flask.render_template("home.html", root=ROOT)
 
 @app.route("/create", methods=["GET", "POST"])
 def create():
     "Create a new note."
     if flask.request.method == "GET":
-        parent = flask.request.values.get("parent") or ''
-        return flask.render_template("create.html", parent=parent)
+        try:
+            supernote = LOOKUP[flask.request.values["supernote"]]
+        except KeyError:
+            supernote = None    # Root supernote.
+        return flask.render_template("create.html", supernote=supernote)
 
     elif flask.request.method == "POST":
+        try:
+            superpath = flask.request.form["supernote"]
+            if not superpath: raise KeyError
+        except KeyError:
+            supernote = ROOT
+        else:
+            try:
+                supernote = LOOKUP[superpath]
+            except KeyError:
+                raise
+                flash_error(f"No such supernote: '{superpath}'")
+                return flask.redirect(flask.url_for("home"))
         title = flask.request.form.get("title") or "No title"
-        # Clean up title.
-        title = title.replace("\n", " ")
+        title = title.replace("\n", " ")  # Clean up title.
         title = title.replace("/", " ")
         title = title.strip()
         title = title.lstrip(".")
         title = title.lstrip("_")
-        # Clean up parent path.
-        parent = flask.request.form.get("parent") or ""
-        parent = parent.replace("\n", " ")
-        parent = parent.strip()
-        parent = parent.strip("/")
         text = flask.request.form.get("text") or ""
-        return flask.redirect(flask.url_for('note', path=path))
+        try:
+            note = supernote.create_subnote(title=title, text=text)
+        except ValueError as error:
+            flash_error(error)
+            return flask.redirect(supernote.url)
+        return flask.redirect(note.url)
 
 @app.route("/note")
 @app.route("/note/")
 def root():
-    "Root note information is shown in the home page."
+    "Root note is shown in the home page."
     return flask.redirect(flask.url_for("home"))
 
 @app.route("/note/<path:path>")
@@ -213,42 +315,47 @@ def note(path):
     try:
         note = LOOKUP[path]
     except KeyError:
-        return redirect_error(
-            "No such note.",
-            url=flask.url_for('note', path=os.path.dirname(path)))
-    return flask.render_template("note.html", 
-                                 note=note,
-                                 segments=path.split("/"))
+        raise
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    return flask.render_template("note.html", note=note)
 
 @app.route("/edit/<path:path>", methods=["GET", "POST"])
 def edit(path):
-    "Edit the given note."
+    "Edit the given note; title and/or text."
     try:
-        note = NOTE.get(path)
+        note = LOOKUP[path]
     except KeyError:
-        return redirect_error(
-            "No such note.",
-            url=flask.url_for('note', path=os.path.dirname(path)))
+        raise
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+
     if flask.request.method == "GET":
         return flask.render_template("edit.html", note=note)
 
     elif flask.request.method == "POST":
-        dirpath = os.path.join(SETTINGS["NOTES_ROOT"], path)
-        if os.path.isdir(dirpath):
-            title = "__dir__"
-        else:
-            dirpath, title = os.path.split(dirpath)
-        write_note(dirpath, title, flask.request.form.get("text") or '')
-        return flask.redirect(flask.url_for("note", path=path))
+        try:
+            title = flask.request.form.get("title") or ""
+            note.title = title
+        except ValueError:
+            flash_error(f"Invalid title: '{title}'")
+            return flask.redirect(flask.url_for("edit", path=path))
+        except KeyError:
+            flash_error(f"Note already exists: '{title}'")
+            return flask.redirect(flask.url_for("edit", path=path))
+        note.text = flask.request.form.get("text") or ''
+        return flask.redirect(note.url)
 
 @app.route("/delete/<path:path>", methods=["POST"])
 def delete(path):
     "Delete the given note."
     try:
-        raise NotImplementedError
+        note = LOOKUP[path]
     except KeyError as error:
         flash_error(error)
-    return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    else:
+        raise NotImplementedError
+    return flask.redirect(note.supernote.url)
 
 
 if __name__ == "__main__":
@@ -259,9 +366,9 @@ if __name__ == "__main__":
     else:
         dirpath = os.path.join(os.getcwd(), "notes")
     if not os.path.exists(dirpath):
-        sys.exit(f"no such directory '{dirpath}'")
+        sys.exit(f"No such directory: {dirpath}")
     if not os.path.isdir(dirpath):
-        sys.exit(f"'{dirpath}' is not a directory")
+        sys.exit(f"Not a directory: {dirpath}")
     try:
         filepath = os.path.join(dirpath, ".settings.json")
         with open(filepath) as infile:
@@ -269,6 +376,6 @@ if __name__ == "__main__":
         SETTINGS["SETTINGS_FILEPATH"] = filepath
     except OSError:
         SETTINGS["SETTINGS_FILEPATH"] = None
-    SETTINGS["NOTES_ROOT"] = dirpath
+    SETTINGS["NOTES_DIRPATH"] = dirpath
     app.config.from_mapping(SETTINGS)
     app.run(debug=True)

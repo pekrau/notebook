@@ -8,9 +8,9 @@
 <ul class="list-group">
   <a href="{{ url_for('home') }}"
      class="list-group-item list-group-item-light"><i>home</i></a>
-  {% for parent, path in note.parents %}
-  <a href="{{ url_for('note', path=path) }}"
-     class="list-group-item list-group-item-light">/ {{ parent }}</a>
+  {% for supernote in note.supernotes[1:] %}
+  <a href="{{ supernote.url }}"
+     class="list-group-item list-group-item-light">/ {{ supernote.title }}</a>
   {% endfor %}
 </ul>
 {% endblock %} {# block menu #}
@@ -24,7 +24,7 @@
 {% if interactive %}
 <form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2">
   {% if note.path %}
-  <input type="hidden" name="parent" value="{{ note.path }}">
+  <input type="hidden" name="supernote" value="{{ note.path }}">
   {% endif %}
   <button type="submit" class="btn btn-success">Create</button>
 </form>

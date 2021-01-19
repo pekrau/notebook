@@ -2,21 +2,21 @@
 {% if notes and level > 0 %}
 <ul class="list-group">
   {% for note in notes %}
-  {% set idpath = note.idpath %}
   <div class="list-group-item d-flex justify-content-between align-items-center">
     <table width="100%">
       <tbody>
         <tr class="align-top">
           <td width="5%" class="pe-3">
             <button class="btn btn-sm btn-outline-primary" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#{{ idpath }}"
-                    aria-expanded="false" aria-controls="{{ idpath }}">
+                    data-bs-toggle="collapse"
+                    data-bs-target="#{{ note.idpath }}"
+                    aria-expanded="false" aria-controls="{{ note.idpath }}">
               <span class="bi-caret-down"></span>
             </button>
           </td>
           <td class="text-start">
-            <a href="{{ url_for('note', path=note.path) }}"
-               class="text-decoration-none">{{ note.title }}</a>
+            <a href="{{ note.url }}" class="text-decoration-none">
+              {{ note.title }}</a>
           </td>
           <td class="text-end">
             {% if note.subnotes %}
@@ -24,7 +24,7 @@
             {% endif %}
           </td>
         </tr>
-        <tr class="collapse" id="{{ idpath }}">
+        <tr class="collapse" id="{{ note.idpath }}">
           <td></td>
           <td colspan="2">
             {{ note.text | markdown }}

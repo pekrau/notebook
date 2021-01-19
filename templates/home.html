@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}notes {{ config['NOTES_ROOT'] }}{% endblock %}
+{% block head_title %}notes {{ config['NOTES_DIRPATH'] }}{% endblock %}
 {% block body_title %}
-notes <span class="text-muted">{{ config['NOTES_ROOT'] }}</span>
+notes <span class="text-muted">{{ config['NOTES_DIRPATH'] }}</span>
 {% endblock %}
 
 {% block main %}
