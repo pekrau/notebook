@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 import copy as copy_module
 import json
@@ -122,17 +122,23 @@ class Note:
             return flask.url_for("home")
 
     @property
-    def supernotes(self):
-        "Return the list of supernotes."
-        if self.supernote:
-            return self.supernote.supernotes + [self.supernote]
-        else:
-            return []
-
-    @property
     def count(self):
         "Return the number of subnotes."
         return len(self.subnotes)
+
+    def count_traverse(self):
+        "Return the number of subnotes recursively, including this one."
+        result = 1
+        for subnote in self.subnotes:
+            result += subnote.count_traverse()
+        return result
+
+    def supernotes(self):
+        "Return the list of supernotes."
+        if self.supernote:
+            return self.supernote.supernotes() + [self.supernote]
+        else:
+            return []
 
     def traverse(self):
         yield self
@@ -182,14 +188,36 @@ class Note:
         if title in self.subnotes:
             raise ValueError(f"Note already exists: '{title}'")
         if os.path.isfile(f"{self.abspath}.md"):
-            os.mkdir(self.abspath)
-            os.rename(f"{self.abspath}.md",
-                      os.path.join(self.abspath, "__dir__.md"))
+            abspath = self.abspath
+            os.mkdir(abspath)
+            os.rename(f"{abspath}.md", os.path.join(abspath, "__dir__.md"))
         note = Note(self, title, text)
         self.subnotes.sort(key=lambda n: n.title)
         note.write()
         note.add()
         return note
+
+    def is_deletable(self):
+        """May this note be deleted?
+        - Must have no subnotes.
+        - XXX Must have no links to it.
+        """
+        if self.supernote is None: return False
+        if self.count: return False
+        return True
+
+    def delete(self):
+        "Delete this note."
+        if not self.is_deletable():
+            raise ValueError("This note may not be deleted.")
+        # XXX remove links
+        os.remove(f"{self.abspath}.md")
+        self.supernote.subnotes.remove(self)
+        # Convert supernote to file if no subnotes any longer.
+        if self.supernote.count == 0:
+            abspath = self.supernote.abspath
+            os.rename(os.path.join(abspath, "__dir__.md"), f"{abspath}.md")
+            os.rmdir(abspath)
 
     def get_tree(self):
         "Get the note contents as a dict."
@@ -200,9 +228,6 @@ class Note:
         if self.supernote:
             result["supernote"] = self.supernote.path
         return result
-
-ROOT = Note(None, None)
-LOOKUP = dict()
 
 
 class HtmlRenderer(marko.html_renderer.HTMLRenderer):
@@ -237,11 +262,12 @@ def flash_warning(msg): flask.flash(str(msg), "warning")
 def flash_message(msg): flask.flash(str(msg), "message")
 
 
+ROOT = Note(None, None)
+LOOKUP = dict()
+
 app = flask.Flask(__name__)
 
 app.add_template_filter(markdown)
-
-DB = dict()
 
 @app.before_first_request
 def setup():
@@ -315,18 +341,17 @@ def note(path):
     try:
         note = LOOKUP[path]
     except KeyError:
-        raise
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     return flask.render_template("note.html", note=note)
 
+@app.route("/edit/", methods=["GET", "POST"])
 @app.route("/edit/<path:path>", methods=["GET", "POST"])
-def edit(path):
-    "Edit the given note; title and/or text."
+def edit(path=""):
+    "Edit the given note; title (i.e. file/directory rename) and/or text."
     try:
         note = LOOKUP[path]
     except KeyError:
-        raise
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
 
@@ -351,10 +376,14 @@ def delete(path):
     "Delete the given note."
     try:
         note = LOOKUP[path]
-    except KeyError as error:
+    except KeyError:
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    try:
+        note.delete()
+    except ValueError as error:
         flash_error(error)
-    else:
-        raise NotImplementedError
+        return flask.redirect(note.url)
     return flask.redirect(note.supernote.url)
 
 

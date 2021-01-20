@@ -7,10 +7,14 @@
 {% block menu %}
 <ul class="list-group">
   <a href="{{ url_for('home') }}"
-     class="list-group-item list-group-item-light"><i>home</i></a>
-  {% for supernote in note.supernotes[1:] %}
+     class="list-group-item list-group-item-action list-group-item-light">
+    <i>&lt;root&gt;</i>
+  </a>
+  {% for supernote in note.supernotes()[1:] %}
   <a href="{{ supernote.url }}"
-     class="list-group-item list-group-item-light">/ {{ supernote.title }}</a>
+     class="list-group-item list-group-item-action list-group-item-light">
+    / {{ supernote.title }}
+  </a>
   {% endfor %}
 </ul>
 {% endblock %} {# block menu #}
@@ -22,21 +26,22 @@
 
 {% block actions %}
 {% if interactive %}
-<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2">
+<div class="d-grid gap-2">
+  <a href="{{ url_for('edit', path=note.path) }}"
+     class="btn btn-lg btn-primary">Edit</a>
+</div>
+<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2 mt-2">
   {% if note.path %}
   <input type="hidden" name="supernote" value="{{ note.path }}">
   {% endif %}
   <button type="submit" class="btn btn-success">Create</button>
 </form>
-<div class="d-grid gap-2 mt-2">
-  <a href="{{ url_for('edit', path=note.path) }}"
-     class="btn btn-primary">Edit</a>
-</div>
 <div>
   <form action="{{ url_for('delete', path=note.path) }}"
         method="POST"
-        class="d-grid gap-2 mt-2">
-    <button role="submit" class="btn btn-danger"
+        class="d-grid gap-2 mt-4">
+    <button role="submit" class="btn btn-sm btn-danger"
+            {{ not note.is_deletable() and 'disabled' or '' }}
             onclick="return confirm('Really delete recursively? Cannot be undone.')"
             >Delete</button>
   </form>
