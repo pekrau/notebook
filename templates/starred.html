@@ -1,9 +1,11 @@
-{# Most recently modified notes #}
+{# Starred notes #}
 <div class="card mt-3">
-  <div class="card-header bg-secondary text-light py-1">Recent</div>
+  <div class="card-header bg-warning py-1">
+    <span class="bi-star-fill"></span>
+  </div>
   <div class="card-body small py-1">
     <ul class="list-unstyled my-0">
-      {% for note in RECENT %}
+      {% for note in starred() %}
       <li>
         <a href="{{ note.url }}" class="text-decoration-none">
           {{ note.title }}</a>

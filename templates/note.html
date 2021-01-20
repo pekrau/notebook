@@ -26,7 +26,10 @@
     </ul>
   </div>
 </div>
+{% include 'starred.html' %}
+{% if interactive %}
 {% include 'recent.html' %}
+{% endif %} {# if interactive #}
 {% endblock %} {# block menu #}
 
 {% block main %}
@@ -36,18 +39,33 @@
 
 {% block actions %}
 {% if interactive %}
-<div class="d-grid gap-2">
+<form action="{{ url_for('star', path=note.path) }}"
+      class="d-grid gap-2"
+      method="POST">
+  <button type="submit" class="btn btn-sm btn-warning">
+    {% if note.starred %}
+    <span class="bi-star-fill"></span>
+    {% else %}
+    <span class="bi-star"></span>
+    {% endif %}
+  </button>
+</form>
+<div class="d-grid gap-2 mt-4">
   <a href="{{ url_for('edit', path=note.path) }}"
      class="btn btn-lg btn-primary">Edit</a>
 </div>
-<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2 mt-4">
+<form action="{{ url_for('create') }}"
+      class="d-grid gap-2 mt-4"
+      method="GET">
   {% if note.path %}
   <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
   {% endif %}
   <input type="hidden" name="source" value="{{ note.path }}">
   <button type="submit" class="btn btn-success">Create copy</button>
 </form>
-<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2 mt-2">
+<form action="{{ url_for('create') }}" 
+      class="d-grid gap-2 mt-2"
+      method="GET">
   {% if note.path %}
   <input type="hidden" name="supernote" value="{{ note.path }}">
   {% endif %}

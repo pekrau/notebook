@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 import collections
 import json
@@ -19,7 +19,7 @@ SETTINGS = dict(VERSION = __version__,
                 DEBUG = True,
                 JSON_AS_ASCII = False,
                 NOTES_DIRPATH = "notes",
-                MAX_RECENT = 4)
+                MAX_RECENT = 10)
 
 
 class Note:
@@ -100,7 +100,8 @@ class Note:
             RECENT.remove(self)
         except ValueError:
             pass
-        RECENT.appendleft(self)
+        if self.supernote is not None:
+            RECENT.appendleft(self)
 
     modified = property(get_modified, set_modified,
                         doc="The timestamp of the note.")
@@ -139,6 +140,23 @@ class Note:
     def count(self):
         "Return the number of subnotes."
         return len(self.subnotes)
+
+    @property
+    def starred(self):
+        "Is the note starred?"
+        return self in STARRED
+
+    def star(self, remove=False):
+        "Toggle the star state of the note, or force remove."
+        if self in STARRED:
+            STARRED.remove(self)
+        elif not remove:
+            STARRED.add(self)
+        else:
+            return              # No change; no need to update file.
+        filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
+        with open(filepath, "w") as outfile:
+            json.dump({"paths": [n.path for n in STARRED]}, outfile)
 
     def count_traverse(self):
         "Return the number of subnotes recursively, including this one."
@@ -232,6 +250,7 @@ class Note:
         if not self.is_deletable():
             raise ValueError("This note may not be deleted.")
         # XXX remove links
+        self.star(remove=True)
         os.remove(f"{self.abspath}.md")
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer.
@@ -290,6 +309,7 @@ def flash_message(msg): flask.flash(str(msg), "message")
 ROOT = Note(None, None)
 LOOKUP = dict()
 RECENT = None                   # Created in 'setup'
+STARRED = set()
 
 app = flask.Flask(__name__)
 
@@ -307,6 +327,7 @@ def setup():
     RECENT = collections.deque(maxlen=SETTINGS["MAX_RECENT"])
     ROOT.read()                 # Reads in all notes.
     for note in ROOT.traverse():
+        if note.supernote is None: continue # Do not include root note.
         note.add()
         if len(RECENT) == 0:
             RECENT.appendleft(note)
@@ -317,9 +338,18 @@ def setup():
                         RECENT.pop()
                     RECENT.insert(pos, note)
                     break
+    try:
+        filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
+        with open(filepath) as infile:
+            STARRED.update([LOOKUP[p] for p in json.load(infile)["paths"]])
+    except OSError:
+        pass
     print(json.dumps(ROOT.get_tree(), indent=2))
+    print("-- recent --")
     for note in RECENT:
         print(note.path, note.modified)
+    print("starred", STARRED)
+
 
 @app.context_processor
 def setup_template_context():
@@ -328,7 +358,9 @@ def setup_template_context():
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
-                RECENT=RECENT)
+                RECENT=RECENT,
+                starred=starred)
+
 
 @app.route("/")
 def home():
@@ -419,6 +451,20 @@ def edit(path=""):
             return flask.redirect(flask.url_for("edit", path=path))
         note.text = flask.request.form.get("text") or ''
         return flask.redirect(note.url)
+
+@app.route("/star/<path:path>", methods=["POST"])
+def star(path):
+    "Toggle the star state of the note for the path."
+    try:
+        note = LOOKUP[path]
+    except KeyError:
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    note.star()
+    return flask.redirect(note.url)
+
+def starred():
+    return sorted(STARRED, key=lambda n: n.title)
 
 @app.route("/delete/<path:path>", methods=["POST"])
 def delete(path):
