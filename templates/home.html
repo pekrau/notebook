@@ -7,7 +7,7 @@
 {% block menu %}
 <ul class="list-group">
   <li class="list-group-item list-group-item-light">
-    {{ root.count_traverse() }} notes
+    {{ root.count_traverse() }} notes in total
   </li>
 </ul>
 {% endblock %} {# block menu #}
@@ -24,7 +24,7 @@
      class="btn btn-lg btn-primary">Edit</a>
 </div>
 <form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2 mt-2">
-  <button type="submit" class="btn btn-success">Create</button>
+  <button type="submit" class="btn btn-success">Create subnote</button>
 </form>
 {% endif %} {# if interactive #}
 {% endblock %}

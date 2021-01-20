@@ -1,8 +1,7 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
-import copy as copy_module
 import json
 import os
 
@@ -292,6 +291,12 @@ def home():
     "Home page; root note."
     return flask.render_template("home.html", root=ROOT)
 
+@app.route("/note")
+@app.route("/note/")
+def root():
+    "Root note is shown in the home page."
+    return flask.redirect(flask.url_for("home"))
+
 @app.route("/create", methods=["GET", "POST"])
 def create():
     "Create a new note."
@@ -300,7 +305,13 @@ def create():
             supernote = LOOKUP[flask.request.values["supernote"]]
         except KeyError:
             supernote = None    # Root supernote.
-        return flask.render_template("create.html", supernote=supernote)
+        try:
+            source = LOOKUP[flask.request.values["source"]]
+        except KeyError:
+            source = None
+        return flask.render_template("create.html",
+                                     supernote=supernote,
+                                     source=source)
 
     elif flask.request.method == "POST":
         try:
@@ -328,12 +339,6 @@ def create():
             flash_error(error)
             return flask.redirect(supernote.url)
         return flask.redirect(note.url)
-
-@app.route("/note")
-@app.route("/note/")
-def root():
-    "Root note is shown in the home page."
-    return flask.redirect(flask.url_for("home"))
 
 @app.route("/note/<path:path>")
 def note(path):

@@ -28,7 +28,8 @@
         <label for="title" class="col-form-label">Title</label>
         <input type="text" name="title" id="title" autofocus
                class="form-control"
-               aria-describedby="titleHelp">
+               aria-describedby="titleHelp"
+               value="{{ source and ('Copy of ' + source.title) or '' }}">
         <div id="titleHelp" class="form-text">
           Title of the new note; also used for the filename of the note on
           disk.
@@ -36,9 +37,10 @@
       </div>
       <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
-        <textarea name="text" id="text" rows="10"
+        <textarea name="text" id="text" rows="16"
                   class="form-control"
-                  aria-describedby="textHelp"></textarea>
+                  aria-describedby="textHelp"
+                  >{{ source and source.text or '' }}</textarea>
         <div id="textHelp" class="form-text">
           Text of the new note in Markdown format.
         </div>
@@ -53,7 +55,9 @@
 
 {% block actions %}
 <div class="d-grid gap-2">
-  {% if supernote %}
+  {% if source %}
+  <a href="{{ source.url }}" class="btn btn-secondary">Cancel</a>
+  {% elif supernote %}
   <a href="{{ supernote.url }}" class="btn btn-secondary">Cancel</a>
   {% else %}
   <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
