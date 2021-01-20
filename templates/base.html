@@ -27,10 +27,10 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="top_navbar">
-          <ul class="navbar-nav me-auto mb-2 mb-md-0">
+          <ul class="navbar-nav me-auto ms-4">
             <li class="nav-item">
-              <a href="{{ url_for('home') }}"
-                 class="nav-link active fw-bold">notes</a>
+              <a href="#"
+                 class="nav-link active">Tags</a>
             </li>
           </ul>
           <form action="#"
@@ -44,8 +44,12 @@
 
     <div class="container-fluid">
       <div class="row">
-        <div class="col-md-10 offset-md-2">
+        <div class="col-md-8 offset-md-2">
           <h1>{% block body_title %}notes{% endblock %}</h1>
+        </div>
+        <div class="col-md-2 py-1">
+          {% block meta %}
+          {% endblock %}
         </div>
       </div>
       <div class="row">
@@ -65,10 +69,6 @@
             <strong>Message:</strong> {{ msg }}
           </div>
           {% endfor %}
-        </div>
-        <div class="col-md-2 py-1">
-          {% block meta %}
-          {% endblock %}
         </div>
       </div>
 
@@ -96,7 +96,7 @@
       <hr>
       <div class="row">
         <div class="col-md-9 text-muted">
-          Root: {{ config['NOTES_DIRPATH'] }}
+          Root directory: {{ config['NOTES_DIRPATH'] }}
         </div>
         <div class="col-md-3 text-end">
           <a href="https://github.com/pekrau/notes"

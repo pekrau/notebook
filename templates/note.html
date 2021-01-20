@@ -4,19 +4,29 @@
 {% block head_title %}{{ note.title }}{% endblock %}
 {% block body_title %}{{ note.title }}{% endblock %}
 
+{% block meta %}
+<small>{{ note.modified | localtime }}</small>
+{% endblock %}
+
 {% block menu %}
-<ul class="list-group">
-  <a href="{{ url_for('home') }}"
-     class="list-group-item list-group-item-action list-group-item-light">
-    <i>&lt;root&gt;</i>
-  </a>
-  {% for supernote in note.supernotes()[1:] %}
-  <a href="{{ supernote.url }}"
-     class="list-group-item list-group-item-action list-group-item-light">
-    / {{ supernote.title }}
-  </a>
-  {% endfor %}
-</ul>
+<div class="card bg-light">
+  <div class="card-header py-1">Supernotes</div>
+  <div class="card-body py-1">
+    <ul class="list-unstyled my-0">
+      <li>
+        <a href="{{ url_for('home') }}" class="text-decoration-none">
+          <i>&lt;root&gt;</i></a>
+      </li>
+      {% for supernote in note.supernotes()[1:] %}
+      <li>
+        <a href="{{ supernote.url }}" class="text-decoration-none">
+          /{{ supernote.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% include 'recent.html' %}
 {% endblock %} {# block menu #}
 
 {% block main %}

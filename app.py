@@ -1,22 +1,25 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
+import collections
 import json
 import os
+import time
 
 import flask
 import marko
 import jinja2.utils
 
 
-SETTINGS = dict(VERSION=__version__,
-                SERVER_NAME="127.0.0.1:5099",
-                SECRET_KEY="this is a secret key",
-                TEMPLATES_AUTO_RELOAD=True,
-                DEBUG=True,
-                JSON_AS_ASCII=False,
-                NOTES_DIRPATH="notes")
+SETTINGS = dict(VERSION = __version__,
+                SERVER_NAME = "127.0.0.1:5099",
+                SECRET_KEY = "this is a secret key",
+                TEMPLATES_AUTO_RELOAD = True,
+                DEBUG = True,
+                JSON_AS_ASCII = False,
+                NOTES_DIRPATH = "notes",
+                MAX_RECENT = 4)
 
 
 class Note:
@@ -29,6 +32,7 @@ class Note:
         self.subnotes = []
         self._title = title
         self._text = text
+        self._modified = None
 
     def __repr__(self):
         return self.path
@@ -64,9 +68,12 @@ class Note:
         # Actually change the title of the note.
         self._title = title
         if os.path.isdir(old_abspath):
-            os.rename(old_abspath, self.abspath)  # New abspath
+            path = self.abspath
+            os.rename(old_abspath, path)  # New abspath
         else:
-            os.rename(f"{old_abspath}.md", f"{self.abspath}.md")
+            path = f"{self.abspath}.md"
+            os.rename(f"{old_abspath}.md", path)
+        self.modified = os.path.getmtime(path)
         # Add this note and below to lookup with new path.
         for note in self.traverse():
             note.add()
@@ -79,16 +86,24 @@ class Note:
     def set_text(self, text):
         # XXX update links etc
         self._text = text
-        abspath = self.abspath
-        if os.path.isdir(abspath):
-            with open(os.path.join(abspath, "__dir__.md"), "w") as outfile:
-                outfile.write(text)
-        else:
-            with open(f"{abspath}.md", "w") as outfile:
-                outfile.write(text)
+        self.write()            # Sets modification timestamp.
 
     text = property(get_text, set_text,
                     doc="The Markdown-formatted text of the note.")
+
+    def get_modified(self):
+        return self._modified
+
+    def set_modified(self, modified):
+        self._modified = modified
+        try:
+            RECENT.remove(self)
+        except ValueError:
+            pass
+        RECENT.appendleft(self)
+
+    modified = property(get_modified, set_modified,
+                        doc="The timestamp of the note.")
 
     @property
     def path(self):
@@ -145,13 +160,16 @@ class Note:
             yield from subnote.traverse()
 
     def write(self):
-        "Write this note to disk. Does NOT write subnotes."
+        "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
-            with open(os.path.join(self.abspath, "__dir__.md"), "w") as outfile:
+            path = os.path.join(self.abspath, "__dir__.md")
+            with open(path, "w") as outfile:
                 outfile.write(self.text)
         else:
-            with open(f"{self.abspath}.md", "w") as outfile:
+            path = f"{self.abspath}.md"
+            with open(path, "w") as outfile:
                 outfile.write(self.text)
+        self.modified = os.path.getmtime(path)
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -159,10 +177,12 @@ class Note:
         if os.path.exists(abspath):
             # It's a directory with subnotes.
             try:
-                with open(os.path.join(abspath, "__dir__.md")) as infile:
-                    self.text = infile.read()
+                filepath = os.path.join(abspath, "__dir__.md")
+                with open(filepath) as infile:
+                    self._text = infile.read()
+                self._modified = os.path.getmtime(filepath)  # Set directly!
             except OSError:
-                self.text = ""
+                self._text = ""
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
                 if filename.startswith("_"): continue
@@ -171,8 +191,10 @@ class Note:
                 note.read()
         else:
             # It's a file; no subnotes.
-            with open(f"{abspath}.md") as infile:
-                self.text = infile.read()
+            filepath = f"{abspath}.md"
+            with open(filepath) as infile:
+                self._text = infile.read()
+            self._modified = os.path.getmtime(filepath)  # Set directly!
 
     def add(self):
         "Add the note to the lookup."
@@ -250,9 +272,13 @@ class HtmlRenderer(marko.html_renderer.HTMLRenderer):
         return template.format(url, title, body)
 
 def markdown(value):
-    "Process the value using Marko markdown."
+    "Filter to process the value using Marko markdown."
     processor = marko.Markdown(renderer=HtmlRenderer)
     return jinja2.utils.Markup(processor.convert(value or ""))
+
+def localtime(value):
+    "Filter to convert epoch value to local time ISO string."
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(value))
 
 def flash_error(msg): flask.flash(str(msg), "error")
 
@@ -263,20 +289,37 @@ def flash_message(msg): flask.flash(str(msg), "message")
 
 ROOT = Note(None, None)
 LOOKUP = dict()
+RECENT = None                   # Created in 'setup'
 
 app = flask.Flask(__name__)
 
 app.add_template_filter(markdown)
+app.add_template_filter(localtime)
 
 @app.before_first_request
 def setup():
-    "Read all notes and keep in memory. Set up lookup."
-    # XXX links
-    ROOT.read()
+    """Read all notes and keep in memory. Set up:
+    - Lookup path -> note
+    - List of recent notes
+    - XXX links
+    """
+    global RECENT
+    RECENT = collections.deque(maxlen=SETTINGS["MAX_RECENT"])
+    ROOT.read()                 # Reads in all notes.
     for note in ROOT.traverse():
         note.add()
+        if len(RECENT) == 0:
+            RECENT.appendleft(note)
+        else:
+            for pos, recent in enumerate(RECENT):
+                if note.modified > recent.modified:
+                    if len(RECENT) == RECENT.maxlen:
+                        RECENT.pop()
+                    RECENT.insert(pos, note)
+                    break
     print(json.dumps(ROOT.get_tree(), indent=2))
-    print(list(ROOT.traverse()))
+    for note in RECENT:
+        print(note.path, note.modified)
 
 @app.context_processor
 def setup_template_context():
@@ -284,7 +327,8 @@ def setup_template_context():
     return dict(interactive=True,
                 flash_error=flash_error,
                 flash_warning=flash_warning,
-                flash_message=flash_message)
+                flash_message=flash_message,
+                RECENT=RECENT)
 
 @app.route("/")
 def home():

@@ -1,0 +1,14 @@
+{# Most recently modified notes #}
+<div class="card mt-3">
+  <div class="card-header py-1">Recent</div>
+  <div class="card-body small py-1">
+    <ul class="list-unstyled my-0">
+      {% for note in RECENT %}
+      <li>
+        <a href="{{ note.url }}" class="text-decoration-none">
+          {{ note.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
