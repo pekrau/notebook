@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.6"
+__version__ = "0.3.2"
 
 import collections
 import json
@@ -26,28 +26,30 @@ SETTINGS = dict(VERSION = __version__,
 class Note:
     "Note and its subnotes, if any."
 
-    def __init__(self, supernote, title, text=""):
+    def __init__(self, supernote, title):
         self.supernote = supernote
         if supernote:
             supernote.subnotes.append(self)
         self.subnotes = []
         self._title = title
-        self._text = text
-        self._modified = None
+        self._text = ""
+        self.modified = None
 
     def __repr__(self):
         return self.path
+
+    def __lt__(self, other):
+        return self.title < other.title
 
     def get_title(self):
         return self._title
 
     def set_title(self, title):
-        """Set a new title.
+        """Set a new title, which changes its path.
+        Updates notes that link to this note or its subnotes.
         Raise ValueError if the title is invalid; bad start or end characters.
         Raise KeyError if there is already a note with that title
         """
-        # XXX update lookup for this and all subnotes
-        # XXX update links
         if not self.supernote: return  # Root note has no title to change.
         title = title.strip()
         if not title: raise ValueError
@@ -56,12 +58,13 @@ class Note:
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
         if self._title == title: return
+        # XXX update links
         new_abspath = os.path.join(SETTINGS["NOTES_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
         if os.path.exists(f"{new_abspath}.md"): raise KeyError
-        # Remove this note and below from lookup while old path.
+        # Remove this note and below from LOOKUP while old path.
         for note in self.traverse():
             note.remove()
         # Old abspath needed for renaming directory/file.
@@ -69,13 +72,14 @@ class Note:
         # Actually change the title of the note.
         self._title = title
         if os.path.isdir(old_abspath):
-            path = self.abspath
-            os.rename(old_abspath, path)  # New abspath
+            abspath = self.abspath
+            os.rename(old_abspath, abspath)  # New abspath
         else:
-            path = f"{self.abspath}.md"
-            os.rename(f"{old_abspath}.md", path)
-        self.modified = os.path.getmtime(path)
-        # Add this note and below to lookup with new path.
+            abspath = f"{self.abspath}.md"
+            os.rename(f"{old_abspath}.md", abspath)
+        self.modified = os.path.getmtime(abspath)
+        self.put_recent()
+        # Add this note and below to LOOKUP with new path.
         for note in self.traverse():
             note.add()
 
@@ -86,27 +90,36 @@ class Note:
 
     def set_text(self, text):
         # XXX update links etc
+        # Remove previous links.
+        ast = MARKDOWN_AST.convert(self._text)
+        notelinks = self.get_notelinks(ast["children"])
+        path = self.path
+        for link in notelinks:
+            BACKLINKS[link].remove(path)
         self._text = text
-        print(json.dumps(MARKDOWN_AST.convert(text), indent=2))
-        self.write()            # Sets modification timestamp.
+        ast = MARKDOWN_AST.convert(self._text)
+        notelinks = self.get_notelinks(ast["children"])
+        for ref in notelinks:
+            BACKLINKS.setdefault(ref, set()).add(path)
+        self.write()
 
     text = property(get_text, set_text,
                     doc="The Markdown-formatted text of the note.")
 
-    def get_modified(self):
-        return self._modified
-
-    def set_modified(self, modified):
-        self._modified = modified
-        try:
-            RECENT.remove(self)
-        except ValueError:
-            pass
-        if self.supernote is not None:
-            RECENT.appendleft(self)
-
-    modified = property(get_modified, set_modified,
-                        doc="The timestamp of the note.")
+    def get_notelinks(self, children):
+        """Find the note links in the AST tree.
+        Return the set of paths for the notes linked to.
+        """
+        result = set()
+        if isinstance(children, list):
+            for child in children:
+                if child.get("element") == "note_link":
+                    result.add(child["ref"])
+                try:
+                    result.update(self.get_notelinks(child["children"]))
+                except KeyError:
+                    pass
+        return result
 
     @property
     def path(self):
@@ -179,17 +192,22 @@ class Note:
         for subnote in self.subnotes:
             yield from subnote.traverse()
 
+    def get_backlinks(self):
+        "Get the notes linking to this note."
+        return [LOOKUP[p] for p in BACKLINKS.get(self.path, [])]
+
     def write(self):
         "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
-            path = os.path.join(self.abspath, "__dir__.md")
-            with open(path, "w") as outfile:
+            abspath = os.path.join(self.abspath, "__dir__.md")
+            with open(abspath, "w") as outfile:
                 outfile.write(self.text)
         else:
-            path = f"{self.abspath}.md"
-            with open(path, "w") as outfile:
+            abspath = f"{self.abspath}.md"
+            with open(abspath, "w") as outfile:
                 outfile.write(self.text)
-        self.modified = os.path.getmtime(path)
+        self.modified = os.path.getmtime(abspath)
+        self.put_recent()
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -200,9 +218,10 @@ class Note:
                 filepath = os.path.join(abspath, "__dir__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
-                self._modified = os.path.getmtime(filepath)  # Set directly!
+                self.modified = os.path.getmtime(filepath)
             except OSError:
                 self._text = ""
+                self.modified = os.path.getmtime(abspath)
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
                 if filename.startswith("_"): continue
@@ -214,15 +233,24 @@ class Note:
             filepath = f"{abspath}.md"
             with open(filepath) as infile:
                 self._text = infile.read()
-            self._modified = os.path.getmtime(filepath)  # Set directly!
+            self.modified = os.path.getmtime(filepath)
 
     def add(self):
-        "Add the note to the lookup."
+        "Add the note to the path->note lookup."
         LOOKUP[self.path] = self
 
     def remove(self, path=None):
-        "Remove the note from the lookup."
+        "Remove the note from the path->note lookup."
         LOOKUP.pop(path or self.path)
+
+    def put_recent(self):
+        "Put this note at the head of the recently modified notes."
+        try:
+            RECENT.remove(self)
+        except ValueError:
+            pass
+        if self.supernote is not None:
+            RECENT.appendleft(self)
 
     def create_subnote(self, title, text):
         "Create and return a subnote."
@@ -232,8 +260,9 @@ class Note:
             abspath = self.abspath
             os.mkdir(abspath)
             os.rename(f"{abspath}.md", os.path.join(abspath, "__dir__.md"))
-        note = Note(self, title, text)
-        self.subnotes.sort(key=lambda n: n.title)
+        note = Note(self, title)
+        note.text = text        # This parses for backlinks.
+        self.subnotes.sort()
         note.write()
         note.add()
         return note
@@ -241,10 +270,11 @@ class Note:
     def is_deletable(self):
         """May this note be deleted?
         - Must have no subnotes.
-        - XXX Must have no links to it.
+        - Must have no links to it.
         """
         if self.supernote is None: return False
         if self.count: return False
+        if self.get_backlinks(): return False
         return True
 
     def delete(self):
@@ -283,8 +313,10 @@ class NoteLinkRendererMixin:
         try:
             note = LOOKUP[element.ref]
         except KeyError:
-            return f'<span class="fw-bold text-secondary">{element.ref}</span>'
+            # Stale link; target does not exist.
+            return f'<span class="text-danger">{element.ref}</span>'
         else:
+            # Proper link to target.
             return f'<a class="fw-bold text-decoration-none" href="{note.url}">{note.title}</a>'
 
 class NoteLinkExt:
@@ -324,53 +356,65 @@ app.add_template_filter(localtime)
 @app.before_first_request
 def setup():
     """Read all notes and keep in memory. Set up:
-    - Lookup path -> note
+    - Lookup:  path -> note
     - List of recent notes
-    - XXX links
+    - List of starred notes
+    - Set up map of backlinks
     """
     global RECENT
-    RECENT = collections.deque(maxlen=SETTINGS["MAX_RECENT"])
     ROOT.read()                 # Reads in all notes.
     for note in ROOT.traverse():
         if note.supernote is None: continue # Do not include root note.
         note.add()
-        if len(RECENT) == 0:
-            RECENT.appendleft(note)
-        else:
-            for pos, recent in enumerate(RECENT):
-                if note.modified > recent.modified:
-                    if len(RECENT) == RECENT.maxlen:
-                        RECENT.pop()
-                    RECENT.insert(pos, note)
-                    break
+    RECENT = collections.deque(maxlen=SETTINGS["MAX_RECENT"])
+    notes = []
+    traverser = ROOT.traverse()
+    for note in traverser:
+        notes.append(note)
+        if len(notes) >= RECENT.maxlen:
+            break
+    notes.sort(key=lambda n: n.modified, reverse=True)
+    RECENT.extend(notes)
+    for note in traverser:
+        current = list(RECENT)
+        for pos, recent in enumerate(current):
+            if note.modified > recent.modified:
+                if len(RECENT) == RECENT.maxlen:
+                    RECENT.pop()
+                RECENT.insert(pos, note)
+                break
     try:
         filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
         with open(filepath) as infile:
             STARRED.update([LOOKUP[p] for p in json.load(infile)["paths"]])
     except OSError:
         pass
-    print(json.dumps(ROOT.get_tree(), indent=2))
-    print("-- recent --")
-    for note in RECENT:
-        print(note.path, note.modified)
-    print("starred", STARRED)
-
+    for note in ROOT.traverse():
+        ast = MARKDOWN_AST.convert(note.text)
+        notelinks = note.get_notelinks(ast["children"])
+        path = note.path
+        for link in notelinks:
+            BACKLINKS.setdefault(link, set()).add(path)
+    print(json.dumps(dict([(k, list(v)) for k, v in BACKLINKS.items()]),
+                     indent=2))
 
 @app.context_processor
 def setup_template_context():
     "Add to the global context of Jinja2 templates."
-    return dict(interactive=True,
+    return dict(sorted=sorted,
+                interactive=True,
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
                 RECENT=RECENT,
-                starred=starred)
+                STARRED=STARRED)
 
 
 @app.route("/")
 def home():
     "Home page; root note."
-    return flask.render_template("home.html", root=ROOT)
+    n_links = sum([len(s) for s in BACKLINKS.values()])
+    return flask.render_template("home.html", root=ROOT, n_links=n_links)
 
 @app.route("/note")
 @app.route("/note/")
@@ -467,9 +511,6 @@ def star(path):
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     note.star()
     return flask.redirect(note.url)
-
-def starred():
-    return sorted(STARRED, key=lambda n: n.title)
 
 @app.route("/delete/<path:path>", methods=["POST"])
 def delete(path):

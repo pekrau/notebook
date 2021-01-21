@@ -8,18 +8,13 @@
 {% if interactive %}
 <form action="{{ url_for('create') }}" class="d-flex me-2"
       method="GET">
-  <button type="submit" class="btn btn-success"
+  <button type="submit" class="btn btn-outline-success"
           title="Create a subnote for this note.">Subnote</button>
 </form>
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
 
 {% block left %}
-<ul class="list-group">
-  <li class="list-group-item list-group-item-light">
-    {{ root.count_traverse() }} notes in total
-  </li>
-</ul>
 {% include 'starred.html' %}
 {% if interactive %}
 {% include 'recent.html' %}
@@ -30,6 +25,20 @@
 {{ root.text | markdown }}
 {{ macros.noteslist(root.subnotes, 2) }}
 {% endblock %} {# block main #}
+
+{% block right %}
+<div class="card mb-3">
+  <div class="card card-header">Totals</div>
+  <ul class="list-group list-group-flush">
+    <li class="list-group-item list-group-item-light">
+      {{ root.count_traverse() }} notes
+    </li>
+    <li class="list-group-item list-group-item-light">
+      {{ n_links }} links
+    </li>
+  </ul>
+</div>
+{% endblock %} {# block right #}
 
 {% block javascript %}
 <script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>

@@ -2,7 +2,9 @@
 {% import 'macros.html' as macros with context %}
 
 {% block head_title %}{{ note.title }}{% endblock %}
-{% block body_title %}{{ note.title }}{% endblock %}
+{% block body_title %}
+{{ note.title }}
+{% endblock %}
 
 {% block navbar %}
 {% if interactive %}
@@ -24,7 +26,7 @@
 </div>
 <form action="{{ url_for('create') }}" class="d-flex me-2"
       method="GET">
-  {% if note.path %}
+  {% if note.supernote %}
   <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
   {% endif %}
   <input type="hidden" name="source" value="{{ note.path }}">
@@ -50,6 +52,10 @@
 {% endblock %} {# block navbar #}
 
 {% block meta %}
+<button class="btn btn-clipboard btn-outline-none ps-0"
+        data-clipboard-text="[[{{ note.path }}]]">
+  <span class="bi-clipboard text-dark"></span>
+</button>
 <small>{{ note.modified | localtime }}</small>
 {% endblock %}
 
@@ -81,6 +87,10 @@
 {{ note['text'] | markdown }}
 {{ macros.noteslist(note.subnotes, 2) }}
 {% endblock %} {# block main #}
+
+{% block right %}
+{% include 'backlinks.html' %}
+{% endblock %}
 
 {% block javascript %}
 <script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
