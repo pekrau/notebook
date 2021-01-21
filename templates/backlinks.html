@@ -1,0 +1,22 @@
+{# Notes linking to this note. #}
+<div class="card">
+  <div class="card-header bg-primary text-light py-1">Linked from</div>
+  <div class="card-body small py-1">
+    <table width="100%">
+      {% for source in sorted(note.get_backlinks()) %}
+      <tr>
+        <td class="py-0">
+          <a href="{{ source.url }}" class="text-decoration-none">
+            {{ source.title }}</a>
+        </td>
+        <td class="align-right py-0">
+          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
+                  data-clipboard-text="[[{{ source.path }}]]">
+            <span class="bi-clipboard text-dark"></span>
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
