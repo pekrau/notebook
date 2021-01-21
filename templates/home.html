@@ -30,3 +30,10 @@
 {{ root.text | markdown }}
 {{ macros.noteslist(root.subnotes, 2) }}
 {% endblock %} {# block main #}
+
+{% block javascript %}
+<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
+<script>
+ var clipboard = new ClipboardJS('.btn-clipboard');
+</script>
+{% endblock %}

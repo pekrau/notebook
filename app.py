@@ -9,6 +9,7 @@ import time
 
 import flask
 import marko
+import marko.ast_renderer
 import jinja2.utils
 
 
@@ -86,6 +87,7 @@ class Note:
     def set_text(self, text):
         # XXX update links etc
         self._text = text
+        print(json.dumps(MARKDOWN_AST.convert(text), indent=2))
         self.write()            # Sets modification timestamp.
 
     text = property(get_text, set_text,
@@ -270,30 +272,32 @@ class Note:
         return result
 
 
-class HtmlRenderer(marko.html_renderer.HTMLRenderer):
-    """Extension of HTML renderer to allow setting <a> attribute '_target'
-    to '_blank', when the title begins with an exclamation point '!'.
-    """
+class NoteLink(marko.inline.InlineElement):
+    pattern = r'\[\[ *(.+?) *\]\]'
+    parse_children = False
+    def __init__(self, match):
+        self.ref = match.group(1)
 
-    def render_link(self, element):
-        if element.title and element.title.startswith('!'):
-            template = '<a target="_blank" href="{}"{}>{}</a>'
-            element.title = element.title[1:]
+class NoteLinkRendererMixin:
+    def render_note_link(self, element):
+        try:
+            note = LOOKUP[element.ref]
+        except KeyError:
+            return f'<span class="fw-bold text-secondary">{element.ref}</span>'
         else:
-            template = '<a href="{}"{}>{}</a>'
-        title = (
-            ' title="{}"'.format(self.escape_html(element.title))
-            if element.title
-            else ""
-        )
-        url = self.escape_url(element.dest)
-        body = self.render_children(element)
-        return template.format(url, title, body)
+            return f'<a class="fw-bold text-decoration-none" href="{note.url}">{note.title}</a>'
+
+class NoteLinkExt:
+    elements = [NoteLink]
+    renderer_mixins = [NoteLinkRendererMixin]
+
+MARKDOWN = marko.Markdown(extensions=[NoteLinkExt])
+MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt],
+                              renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
-    "Filter to process the value using Marko markdown."
-    processor = marko.Markdown(renderer=HtmlRenderer)
-    return jinja2.utils.Markup(processor.convert(value or ""))
+    "Filter to process the value using augmented Marko markdown."
+    return jinja2.utils.Markup(MARKDOWN.convert(value or ""))
 
 def localtime(value):
     "Filter to convert epoch value to local time ISO string."
@@ -307,9 +311,10 @@ def flash_message(msg): flask.flash(str(msg), "message")
 
 
 ROOT = Note(None, None)
-LOOKUP = dict()
+LOOKUP = dict()                 # path -> note
 RECENT = None                   # Created in 'setup'
-STARRED = set()
+STARRED = set()                 # Notes
+BACKLINKS = dict()              # target note path -> set of source target paths
 
 app = flask.Flask(__name__)
 

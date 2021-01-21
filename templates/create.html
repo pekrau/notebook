@@ -3,6 +3,11 @@
 {% block head_title %}Create a new note{% endblock %}
 {% block body_title %}Create a new note{% endblock %}
 
+{% block left %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
+{% endblock %} {# block left #}
+
 {% block main %}
 <div class="card">
   <div class="card-body">
@@ -60,3 +65,10 @@
   {% endif %}
 </div>
 {% endblock %} {# block right #}
+
+{% block javascript %}
+<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
+<script>
+ var clipboard = new ClipboardJS('.btn-clipboard');
+</script>
+{% endblock %}

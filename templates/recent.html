@@ -1,14 +1,22 @@
 {# Most recently modified notes #}
-<div class="card mt-3">
+<div class="card mb-3">
   <div class="card-header bg-secondary text-light py-1">Recent</div>
   <div class="card-body small py-1">
-    <ul class="list-unstyled my-0">
+    <table width="100%">
       {% for note in RECENT %}
-      <li>
-        <a href="{{ note.url }}" class="text-decoration-none">
-          {{ note.title }}</a>
-      </li>
+      <tr>
+        <td class="py-0">
+          <a href="{{ note.url }}" class="text-decoration-none">
+            {{ note.title }}</a>
+        </td>
+        <td class="align-right py-0">
+          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
+                  data-clipboard-text="[[{{ note.path }}]]">
+            <span class="bi-clipboard text-dark"></span>
+          </button>
+        </td>
+      </tr>
       {% endfor %}
-    </ul>
+    </table>
   </div>
 </div>

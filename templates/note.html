@@ -54,7 +54,7 @@
 {% endblock %}
 
 {% block left %}
-<div class="card bg-light">
+<div class="card bg-light mb-3">
   <div class="card-header py-1">Supernotes</div>
   <div class="card-body py-1">
     <ul class="list-unstyled my-0">
@@ -81,3 +81,10 @@
 {{ note['text'] | markdown }}
 {{ macros.noteslist(note.subnotes, 2) }}
 {% endblock %} {# block main #}
+
+{% block javascript %}
+<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
+<script>
+ var clipboard = new ClipboardJS('.btn-clipboard');
+</script>
+{% endblock %}
