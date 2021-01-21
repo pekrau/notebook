@@ -14,7 +14,7 @@ import jinja2.utils
 
 
 SETTINGS = dict(VERSION = __version__,
-                SERVER_NAME = "127.0.0.1:5099",
+                SERVER_NAME = "localhost:5099",
                 SECRET_KEY = "this is a secret key",
                 TEMPLATES_AUTO_RELOAD = True,
                 DEBUG = True,
