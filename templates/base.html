@@ -27,12 +27,14 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="top_navbar">
-          <ul class="navbar-nav me-auto ms-4">
+          <ul class="navbar-nav me-auto ms-md-4">
             <li class="nav-item">
               <a href="#"
                  class="nav-link active">Tags</a>
             </li>
           </ul>
+          {% block navbar %}
+          {% endblock %}
           <form action="#"
                 class="d-flex">
             <input class="form-control me-2" type="search"
@@ -75,7 +77,7 @@
       {% block supermain %}
       <div class="row">
         <div class="col-md-2">
-          {% block menu %}
+          {% block left %}
           {% endblock %}
         </div>
         <div class="col-md-8">
@@ -84,7 +86,7 @@
         </div>
         <div class="col-md-2">
           <div>
-            {% block actions %}
+            {% block right %}
             {% endblock %}
           </div>
           <div>

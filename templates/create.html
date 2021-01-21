@@ -3,10 +3,6 @@
 {% block head_title %}Create a new note{% endblock %}
 {% block body_title %}Create a new note{% endblock %}
 
-{% block new %}
-<div class="col-md-2"></div>
-{% endblock %}
-
 {% block main %}
 <div class="card">
   <div class="card-body">
@@ -53,7 +49,7 @@
 </div>
 {% endblock %} {# block main #}
 
-{% block actions %}
+{% block right %}
 <div class="d-grid gap-2">
   {% if source %}
   <a href="{{ source.url }}" class="btn btn-secondary">Cancel</a>
@@ -63,4 +59,4 @@
   <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
   {% endif %}
 </div>
-{% endblock %} {# block actions #}
+{% endblock %} {# block right #}

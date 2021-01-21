@@ -4,11 +4,56 @@
 {% block head_title %}{{ note.title }}{% endblock %}
 {% block body_title %}{{ note.title }}{% endblock %}
 
+{% block navbar %}
+{% if interactive %}
+<form action="{{ url_for('star', path=note.path) }}" class="d-flex me-2"
+      method="POST">
+  {% if note.starred %}
+  <button type="submit" class="btn btn-warning">
+    <span class="bi-star-fill" title="Unstar this note."></span>
+  </button>
+  {% else %}
+  <button type="submit" class="btn btn-outline-warning">
+    <span class="bi-star-fill" title="Star this note."></span>
+  </button>
+  {% endif %}
+</form>
+<div class="d-flex mx-md-4">
+  <a href="{{ url_for('edit', path=note.path) }}"
+     class="btn btn-outline-primary px-4">Edit</a>
+</div>
+<form action="{{ url_for('create') }}" class="d-flex me-2"
+      method="GET">
+  {% if note.path %}
+  <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
+  {% endif %}
+  <input type="hidden" name="source" value="{{ note.path }}">
+  <button type="submit" class="btn btn-outline-success"
+          title="Create a copy of this note.">Copy</button>
+</form>
+<form action="{{ url_for('create') }}" class="d-flex me-2"
+      method="GET">
+  {% if note.path %}
+  <input type="hidden" name="supernote" value="{{ note.path }}">
+  {% endif %}
+  <button type="submit" class="btn btn-outline-success"
+          title="Create a subnote for this note.">Subnote</button>
+</form>
+<form action="{{ url_for('delete', path=note.path) }}" class="d-flex me-2"
+      method="POST">
+  <button role="submit" class="btn btn-outline-danger"
+          {{ not note.is_deletable() and 'disabled' or '' }}
+          onclick="return confirm('Really delete recursively? Cannot be undone.')"
+          >Delete</button>
+</form>
+{% endif %} {# if interactive #}
+{% endblock %} {# block navbar #}
+
 {% block meta %}
 <small>{{ note.modified | localtime }}</small>
 {% endblock %}
 
-{% block menu %}
+{% block left %}
 <div class="card bg-light">
   <div class="card-header py-1">Supernotes</div>
   <div class="card-body py-1">
@@ -30,56 +75,9 @@
 {% if interactive %}
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
-{% endblock %} {# block menu #}
+{% endblock %} {# block left #}
 
 {% block main %}
 {{ note['text'] | markdown }}
 {{ macros.noteslist(note.subnotes, 2) }}
 {% endblock %} {# block main #}
-
-{% block actions %}
-{% if interactive %}
-<form action="{{ url_for('star', path=note.path) }}"
-      class="d-grid gap-2"
-      method="POST">
-  <button type="submit" class="btn btn-sm btn-warning">
-    {% if note.starred %}
-    <span class="bi-star-fill"></span>
-    {% else %}
-    <span class="bi-star"></span>
-    {% endif %}
-  </button>
-</form>
-<div class="d-grid gap-2 mt-4">
-  <a href="{{ url_for('edit', path=note.path) }}"
-     class="btn btn-lg btn-primary">Edit</a>
-</div>
-<form action="{{ url_for('create') }}"
-      class="d-grid gap-2 mt-4"
-      method="GET">
-  {% if note.path %}
-  <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
-  {% endif %}
-  <input type="hidden" name="source" value="{{ note.path }}">
-  <button type="submit" class="btn btn-success">Create copy</button>
-</form>
-<form action="{{ url_for('create') }}" 
-      class="d-grid gap-2 mt-2"
-      method="GET">
-  {% if note.path %}
-  <input type="hidden" name="supernote" value="{{ note.path }}">
-  {% endif %}
-  <button type="submit" class="btn btn-success">Create subnote</button>
-</form>
-<div>
-  <form action="{{ url_for('delete', path=note.path) }}"
-        method="POST"
-        class="d-grid gap-2 mt-4">
-    <button role="submit" class="btn btn-sm btn-danger"
-            {{ not note.is_deletable() and 'disabled' or '' }}
-            onclick="return confirm('Really delete recursively? Cannot be undone.')"
-            >Delete</button>
-  </form>
-</div>
-{% endif %} {# if interactive #}
-{% endblock %}

@@ -4,7 +4,17 @@
 {% block head_title %}notes &lt;root&gt;{% endblock %}
 {% block body_title %}notes <i>&lt;root&gt;</i>{% endblock %}
 
-{% block menu %}
+{% block navbar %}
+{% if interactive %}
+<form action="{{ url_for('create') }}" class="d-flex me-2"
+      method="GET">
+  <button type="submit" class="btn btn-success"
+          title="Create a subnote for this note.">Subnote</button>
+</form>
+{% endif %} {# if interactive #}
+{% endblock %} {# block navbar #}
+
+{% block left %}
 <ul class="list-group">
   <li class="list-group-item list-group-item-light">
     {{ root.count_traverse() }} notes in total
@@ -14,21 +24,9 @@
 {% if interactive %}
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
-{% endblock %} {# block menu #}
+{% endblock %} {# block left #}
 
 {% block main %}
 {{ root.text | markdown }}
 {{ macros.noteslist(root.subnotes, 2) }}
 {% endblock %} {# block main #}
-
-{% block actions %}
-{% if interactive %}
-<form action="{{ url_for('create') }}" method="GET" class="d-grid gap-2">
-  <button type="submit" class="btn btn-success">Create subnote</button>
-</form>
-<div class="d-grid gap-2 mt-4">
-  <a href="{{ url_for('edit', path='') }}"
-     class="btn btn-primary">Edit</a>
-</div>
-{% endif %} {# if interactive #}
-{% endblock %}

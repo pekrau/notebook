@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 
 import collections
 import json
