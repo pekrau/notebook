@@ -3,13 +3,6 @@
 {% block head_title %}Edit note '{{ note["title"] or '<root>' }}'{% endblock %}
 {% block body_title %}Edit note '{{ note["title"] or '<root>' }}'{% endblock %}
 
-{% block navbar %}
-<div class="d-flex mx-md-4">
-  <a href="{{ url_for('note', path=note['path']) }}"
-     class="btn btn-secondary px-5">Cancel</a>
-</div>
-{% endblock %} {# block navbar #}
-
 {% block meta %}
 <button class="btn btn-clipboard btn-outline-none ps-0"
         data-clipboard-text="[[{{ note.path }}]]">
@@ -19,13 +12,16 @@
 {% endblock %}
 
 {% block left %}
-{% include 'starred.html' %}
-{% include 'recent.html' %}
+<div class="d-grid gap-2 mb-md-3">
+  <a href="{{ url_for('note', path=note['path']) }}"
+     class="btn btn-secondary px-5">Cancel</a>
+</div>
+{% include 'backlinks.html' %}
 {% endblock %} {# block left #}
 
 {% block main %}
 <div class="card">
-  <div class="card-body">
+  <div class="card-body py-0">
     <form action="{{ url_for('edit', path=note['path']) }}"
           method="POST">
       {% if note.supernote %}
@@ -39,7 +35,7 @@
       {% endif %}
       <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
-        <textarea name="text" id="text" rows="20" autofocus
+        <textarea name="text" id="text" rows="16" autofocus
                   aria-describedby="textHelp"
                   class="form-control">{{ note['text'] or '' }}</textarea>
         <div id="textHelp" class="form-text">
@@ -52,10 +48,13 @@
     </form>
   </div>
 </div>
+<a href="{{ url_for('note', path=note['path']) }}"
+   class="btn btn-secondary m-md-3 px-5">Cancel</a>
 {% endblock %} {# block main #}
 
 {% block right %}
-{% include 'backlinks.html' %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
 {% endblock %} {# block right #}
 
 {% block javascript %}

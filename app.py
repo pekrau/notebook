@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"
 
 import collections
 import json
@@ -13,6 +13,12 @@ import marko
 import marko.ast_renderer
 import jinja2.utils
 
+
+ROOT = None           # Created in 'setup'
+LOOKUP = dict()       # path->note lookup
+RECENT = None         # Created in 'setup'
+STARRED = set()       # Notes
+BACKLINKS = dict()    # target note path -> set of source target paths
 
 SETTINGS = dict(VERSION = __version__,
                 SERVER_NAME = "localhost:5099",
@@ -380,12 +386,10 @@ def flash_warning(msg): flask.flash(str(msg), "warning")
 
 def flash_message(msg): flask.flash(str(msg), "message")
 
+def get_starred(): return sorted(STARRED)
 
-ROOT = Note(None, None)
-LOOKUP = dict()                 # path->note lookup
-RECENT = None                   # Created in 'setup'
-STARRED = set()                 # Notes
-BACKLINKS = dict()              # target note path -> set of source target paths
+def get_recent(): return list(RECENT)
+
 
 app = flask.Flask(__name__)
 
@@ -400,14 +404,19 @@ def setup():
     - List of starred notes
     - Set up map of backlinks
     """
+    global ROOT
     global RECENT
     # Read in all notes, add to the path->note lookup.
+    ROOT = Note(None, None)
     ROOT.read()
-    for note in ROOT.traverse():
-        if note.supernote is None: continue # Do not include root note.
+    traverser = ROOT.traverse()
+    next(traverser)             # Skip root note.
+    for note in traverser:
         note.add_lookup()
     # Set up most recently modified notes.
-    notes = list(ROOT.traverse())[1:] # Do not include root note.
+    traverser = ROOT.traverse()
+    next(traverser)             # Skip root note.
+    notes = list(traverser)     # XXX simple but not very good
     notes.sort(key=lambda n: n.modified, reverse=True)
     RECENT = collections.deque(notes[:SETTINGS["MAX_RECENT"]],
                                maxlen=SETTINGS["MAX_RECENT"])
@@ -421,12 +430,6 @@ def setup():
     # Set up the backlinks for all notes.
     for note in ROOT.traverse():
         note.add_backlinks()
-
-def get_starred():
-    return sorted(STARRED)
-
-def get_recent():
-    return list(RECENT)
 
 def put_recent(note):
     "Put the note to the start of the list of recently modified notes."
@@ -443,7 +446,7 @@ def check_recent():
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
-            print("RECENT out of order:", note, latest)
+            print(f"RECENT out of order: '{note}', '{latest}'")
             for n in RECENT:
                 print(n, localtime(n.modified))
             return False

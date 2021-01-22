@@ -4,8 +4,15 @@
 {% block body_title %}Create a new note{% endblock %}
 
 {% block left %}
-{% include 'starred.html' %}
-{% include 'recent.html' %}
+<div class="d-grid gap-2">
+  {% if source %}
+  <a href="{{ source.url }}" class="btn btn-secondary">Cancel</a>
+  {% elif supernote %}
+  <a href="{{ supernote.url }}" class="btn btn-secondary">Cancel</a>
+  {% else %}
+  <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+  {% endif %}
+</div>
 {% endblock %} {# block left #}
 
 {% block main %}
@@ -55,15 +62,8 @@
 {% endblock %} {# block main #}
 
 {% block right %}
-<div class="d-grid gap-2">
-  {% if source %}
-  <a href="{{ source.url }}" class="btn btn-secondary">Cancel</a>
-  {% elif supernote %}
-  <a href="{{ supernote.url }}" class="btn btn-secondary">Cancel</a>
-  {% else %}
-  <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
-  {% endif %}
-</div>
+{% include 'starred.html' %}
+{% include 'recent.html' %}
 {% endblock %} {# block right #}
 
 {% block javascript %}

@@ -81,10 +81,7 @@
     </ul>
   </div>
 </div>
-{% include 'starred.html' %}
-{% if interactive %}
-{% include 'recent.html' %}
-{% endif %} {# if interactive #}
+{% include 'backlinks.html' %}
 {% endblock %} {# block left #}
 
 {% block main %}
@@ -93,7 +90,10 @@
 {% endblock %} {# block main #}
 
 {% block right %}
-{% include 'backlinks.html' %}
+{% if interactive %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
+{% endif %} {# if interactive #}
 {% endblock %}
 
 {% block javascript %}
