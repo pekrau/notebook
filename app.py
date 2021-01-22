@@ -109,7 +109,7 @@ class Note:
             note.write()
         # Add back backlinks with new paths in place.
         for note in affected:
-            note.remove_backlinks()
+            note.add_backlinks()
 
     title = property(get_title, set_title, doc="The title of the note.")
 
