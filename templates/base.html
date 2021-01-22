@@ -27,10 +27,20 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="top_navbar">
-          <ul class="navbar-nav ms-md-3">
-            <li class="nav-item">
-              <a href="#"
-                 class="nav-link active">Tags</a>
+          <ul class="navbar-nav mx-md-3">
+            <li class="nav-item dropdown">
+              <a href="#" id="tagsDropdown"
+                 role="button" data-bs-toggle="dropdown"
+                 class="nav-link dropdown-toggle"
+                 aria-expanded="false">Hashtags</a>
+              <ul class="dropdown-menu" aria-labelledby="tagsDropdown">
+                {% for word in get_hashtags() %}
+                <li>
+                  <a href="{{ url_for('hashtag', word=word) }}"
+                     class="dropdown-item"><i>#{{ word }}</i></a>
+                </li>
+                {% endfor %}
+              </ul>
             </li>
           </ul>
           <div class="navbar-nav me-auto">

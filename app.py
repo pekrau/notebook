@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.3.5"
+__version__ = "0.4.0"
 
 import collections
 import json
@@ -16,9 +16,10 @@ import jinja2.utils
 
 ROOT = None           # Created in 'setup'
 LOOKUP = dict()       # path->note lookup
-RECENT = None         # Created in 'setup'
 STARRED = set()       # Notes
+RECENT = None         # Created in 'setup'
 BACKLINKS = dict()    # target note path -> set of source target paths
+HASHTAGS = dict()     # word -> set of note paths
 
 SETTINGS = dict(VERSION = __version__,
                 SERVER_NAME = "localhost:5099",
@@ -40,6 +41,7 @@ class Note:
         self.subnotes = []
         self._title = title
         self._text = ""
+        self._ast = None
         self.modified = None
 
     def __repr__(self):
@@ -82,9 +84,10 @@ class Note:
             except KeyError:
                 pass
         affected = [LOOKUP[p] for p in affected]
-        # Remove all backlinks while old paths.
+        # Remove all backlinks and hashtags while old paths.
         for note in affected:
             note.remove_backlinks()
+            note.remove_hashtags()
         # Remember the old path for each note whose paths will change.
         old_paths = [n.path for n in changing]
         # Remove this note and below from the path->note lookup while old path.
@@ -116,9 +119,10 @@ class Note:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
             note.text = text
             note.write()
-        # Add back backlinks with new paths in place.
+        # Add back backlinks and hashtags with new paths in place.
         for note in affected:
             note.add_backlinks()
+            note.add_hashtags()
 
     title = property(get_title, set_title, doc="The title of the note.")
 
@@ -127,27 +131,21 @@ class Note:
 
     def set_text(self, text):
         self.remove_backlinks()
+        self.remove_hashtags()
         self._text = text
+        self._ast = None
         self.add_backlinks()
+        self.add_hashtags()
         self.write()
 
     text = property(get_text, set_text,
                     doc="The text of the note using Markdown format.")
 
-    def get_linkpaths(self, children):
-        """Find the note links in the AST tree.
-        Return the set of paths for the notes linked to.
-        """
-        result = set()
-        if isinstance(children, list):
-            for child in children:
-                if child.get("element") == "note_link":
-                    result.add(child["ref"])
-                try:
-                    result.update(self.get_linkpaths(child["children"]))
-                except KeyError:
-                    pass
-        return result
+    @property
+    def ast(self):
+        if self._ast is None:
+            self._ast = MARKDOWN_AST.convert(self.text)
+        return self._ast
 
     @property
     def path(self):
@@ -243,9 +241,11 @@ class Note:
                 filepath = os.path.join(abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
+                    self._ast = None
                 self.modified = os.path.getmtime(filepath)
             except OSError:
                 self._text = ""
+                self._ast = None
                 self.modified = os.path.getmtime(abspath)
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
@@ -258,6 +258,7 @@ class Note:
             filepath = f"{abspath}.md"
             with open(filepath) as infile:
                 self._text = infile.read()
+                self._ast = None
             self.modified = os.path.getmtime(filepath)
 
     def add_lookup(self):
@@ -273,23 +274,68 @@ class Note:
         return sorted([LOOKUP[p] for p in BACKLINKS.get(self.path, [])])
 
     def add_backlinks(self):
-        "Add the links from this text to other notes."
-        ast = MARKDOWN_AST.convert(self.text)
-        linkpaths = self.get_linkpaths(ast["children"])
+        "Add the links to other notes in this note to the lookup."
+        linkpaths = self.parse_linkpaths(self.ast["children"])
         path = self.path
         for link in linkpaths:
             BACKLINKS.setdefault(link, set()).add(path)
 
     def remove_backlinks(self):
-        "Remove the links from this note to other notes."
-        ast = MARKDOWN_AST.convert(self.text)
-        linkpaths = self.get_linkpaths(ast["children"])
+        "Remove the links to other notes in this note from the lookup."
+        linkpaths = self.parse_linkpaths(self.ast["children"])
         path = self.path
         for link in linkpaths:
             try:
                 BACKLINKS[link].remove(path)
             except KeyError:    # When stale link.
                 pass
+
+    def parse_linkpaths(self, children):
+        """Find the note links in the children of the AST tree.
+        Return the set of paths for the notes linked to.
+        """
+        result = set()
+        if isinstance(children, list):
+            for child in children:
+                if child.get("element") == "note_link":
+                    result.add(child["ref"])
+                try:
+                    result.update(self.parse_linkpaths(child["children"]))
+                except KeyError:
+                    pass
+        return result
+
+    def add_hashtags(self):
+        "Add the hashtags in this note to the lookup."
+        path = self.path
+        for word in self.parse_hashtags(self.ast["children"]):
+            HASHTAGS.setdefault(word, set()).add(path)
+
+    def remove_hashtags(self):
+        "Remove the hashtags in this note from the lookup."
+        path = self.path
+        for word in self.parse_hashtags(self.ast["children"]):
+            try:
+                HASHTAGS[word].remove(path)
+            except KeyError:
+                pass
+            if not HASHTAGS[word]:
+                HASHTAGS.pop(word)
+
+    def parse_hashtags(self, children):
+        """Find the hashtags in the children of the AST tree.
+        Return the set of words.
+        """
+        result = set()
+        if isinstance(children, list):
+            for child in children:
+                if child.get("element") == "hash_tag":
+                    result.add(child["word"])
+                try:
+                    result.update(self.parse_hashtags(child["children"]))
+                except KeyError:
+                    pass
+        return result
 
     def create_subnote(self, title, text):
         "Create and return a subnote."
@@ -322,6 +368,7 @@ class Note:
             raise ValueError("This note may not be deleted.")
         self.remove_lookup()
         self.remove_backlinks()
+        self.remove_hashtags()
         self.star(remove=True)
         os.remove(f"{self.abspath}.md")
         self.supernote.subnotes.remove(self)
@@ -368,8 +415,23 @@ class NoteLinkExt:
     elements = [NoteLink]
     renderer_mixins = [NoteLinkRendererMixin]
 
-MARKDOWN = marko.Markdown(extensions=[NoteLinkExt])
-MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt],
+class HashTag(marko.inline.InlineElement):
+    pattern = r'#([^#].+?)\b'
+    parse_children = False
+    def __init__(self, match):
+        self.word = match.group(1)
+
+class HashTagRendererMixin:
+    def render_hash_tag(self, element):
+        url = flask.url_for("hashtag", word=element.word)
+        return f'<a class="fst-italic text-decoration-none" href="{url}">#{element.word}</a>'
+
+class HashTagExt:
+    elements = [HashTag]
+    renderer_mixins = [HashTagRendererMixin]
+
+MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt])
+MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt, HashTagExt],
                               renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
@@ -390,6 +452,8 @@ def get_starred(): return sorted(STARRED)
 
 def get_recent(): return list(RECENT)
 
+def get_hashtags(): return sorted(HASHTAGS.keys())
+
 
 app = flask.Flask(__name__)
 
@@ -403,6 +467,7 @@ def setup():
     - List of recent notes
     - List of starred notes
     - Set up map of backlinks
+    - Set up map of hashtags
     """
     global ROOT
     global RECENT
@@ -427,9 +492,12 @@ def setup():
             STARRED.update([LOOKUP[p] for p in json.load(infile)["paths"]])
     except OSError:
         pass
-    # Set up the backlinks for all notes.
+    # Set up the backlinks and hashtags for all notes.
     for note in ROOT.traverse():
         note.add_backlinks()
+        note.add_hashtags()
+    for word, notes in HASHTAGS.items():
+        print(word, notes)
 
 def put_recent(note):
     "Put the note to the start of the list of recently modified notes."
@@ -460,8 +528,9 @@ def setup_template_context():
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
+                get_starred=get_starred,
                 get_recent=get_recent,
-                get_starred=get_starred)
+                get_hashtags=get_hashtags)
 
 
 @app.route("/")
@@ -580,6 +649,11 @@ def delete(path):
         flash_error(error)
         return flask.redirect(note.url)
     return flask.redirect(note.supernote.url)
+
+@app.route("/hashtag/<word>")
+def hashtag(word):
+    notes = [LOOKUP[p] for p in HASHTAGS.get(word, [])]
+    return flask.render_template("hashtag.html", word=word, notes=notes)
 
 
 if __name__ == "__main__":
