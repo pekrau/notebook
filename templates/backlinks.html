@@ -3,7 +3,7 @@
   <div class="card-header bg-primary text-light py-1">Linked from</div>
   <div class="card-body small py-1">
     <table width="100%">
-      {% for source in sorted(note.get_backlinks()) %}
+      {% for source in note.get_backlinks() %}
       <tr>
         <td class="py-0">
           <a href="{{ source.url }}" class="text-decoration-none">

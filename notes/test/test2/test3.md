@@ -1,1 +1,0 @@
-Text in note test3.

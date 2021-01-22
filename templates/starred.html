@@ -5,7 +5,7 @@
   </div>
   <div class="card-body small py-1">
     <table width="100%">
-      {% for note in sorted(STARRED) %}
+      {% for note in get_starred() %}
       <tr>
         <td class="py-0">
           <a href="{{ note.url }}" class="text-decoration-none">

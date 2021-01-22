@@ -3,7 +3,7 @@
   <div class="card-header bg-secondary text-light py-1">Recently changed</div>
   <div class="card-body small py-1">
     <table width="100%">
-      {% for note in RECENT %}
+      {% for note in get_recent() %}
       <tr>
         <td class="py-0">
           <a href="{{ note.url }}" class="text-decoration-none">
