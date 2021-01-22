@@ -1,1 +1,1 @@
-With link to [[subnote/depth2]]
+With link to [[subnote/depth2changed]]

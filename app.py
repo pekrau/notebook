@@ -58,14 +58,30 @@ class Note:
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
         if self._title == title: return
-        # XXX update links
         new_abspath = os.path.join(SETTINGS["NOTES_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
         if os.path.exists(f"{new_abspath}.md"): raise KeyError
+        # The set of notes whose paths will change: this one and all below it.
+        changing = list(self.traverse())
+        print("changing", changing)
+        # The set of notes which link to any of these changed-path notes.
+        affected = set()
+        for note in changing:
+            try:
+                affected.update(BACKLINKS[note.path])
+            except KeyError:
+                pass
+        affected = [LOOKUP[p] for p in affected]
+        print("affected", affected)
+        # Remove all backlinks while old paths.
+        for note in affected:
+            note.remove_backlinks()
+        # Remember the old path for each note whose paths will change.
+        old_paths = [n.path for n in changing]
         # Remove this note and below from LOOKUP while old path.
-        for note in self.traverse():
+        for note in changing:
             note.remove()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
@@ -77,11 +93,23 @@ class Note:
         else:
             abspath = f"{self.abspath}.md"
             os.rename(f"{old_abspath}.md", abspath)
+        # Update modified timestamp and add note to recently changed.
         self.modified = os.path.getmtime(abspath)
         self.put_recent()
         # Add this note and below to LOOKUP with new path.
-        for note in self.traverse():
+        for note in changing:
             note.add()
+        # Get the new path for each note whose path was changed.
+        changed_paths = zip(old_paths, [n.path for n in changing])
+        for note in affected:
+            text = note.text
+            for old_path, new_path in changed_paths:
+                text = text.replace(f"[[old_path]]", f"[[new_path]]")
+            note.text = text
+            note.write()
+        # Add back backlinks with new paths in place.
+        for note in affected:
+            note.remove_backlinks()
 
     title = property(get_title, set_title, doc="The title of the note.")
 
@@ -89,24 +117,15 @@ class Note:
         return self._text
 
     def set_text(self, text):
-        # XXX update links etc
-        # Remove previous links.
-        ast = MARKDOWN_AST.convert(self._text)
-        notelinks = self.get_notelinks(ast["children"])
-        path = self.path
-        for link in notelinks:
-            BACKLINKS[link].remove(path)
+        self.remove_backlinks()
         self._text = text
-        ast = MARKDOWN_AST.convert(self._text)
-        notelinks = self.get_notelinks(ast["children"])
-        for ref in notelinks:
-            BACKLINKS.setdefault(ref, set()).add(path)
+        self.add_backlinks()
         self.write()
 
     text = property(get_text, set_text,
-                    doc="The Markdown-formatted text of the note.")
+                    doc="The text of the note using Markdown format.")
 
-    def get_notelinks(self, children):
+    def get_linkpaths(self, children):
         """Find the note links in the AST tree.
         Return the set of paths for the notes linked to.
         """
@@ -116,7 +135,7 @@ class Note:
                 if child.get("element") == "note_link":
                     result.add(child["ref"])
                 try:
-                    result.update(self.get_notelinks(child["children"]))
+                    result.update(self.get_linkpaths(child["children"]))
                 except KeyError:
                     pass
         return result
@@ -192,10 +211,6 @@ class Note:
         for subnote in self.subnotes:
             yield from subnote.traverse()
 
-    def get_backlinks(self):
-        "Get the notes linking to this note."
-        return [LOOKUP[p] for p in BACKLINKS.get(self.path, [])]
-
     def write(self):
         "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
@@ -242,6 +257,26 @@ class Note:
     def remove(self, path=None):
         "Remove the note from the path->note lookup."
         LOOKUP.pop(path or self.path)
+
+    def get_backlinks(self):
+        "Get the notes linking to this note."
+        return [LOOKUP[p] for p in BACKLINKS.get(self.path, [])]
+
+    def add_backlinks(self):
+        "Add the links from this text to other notes."
+        ast = MARKDOWN_AST.convert(self.text)
+        linkpaths = self.get_linkpaths(ast["children"])
+        path = self.path
+        for link in linkpaths:
+            BACKLINKS.setdefault(link, set()).add(path)
+
+    def remove_backlinks(self):
+        "Remove the links from this text to other notes."
+        ast = MARKDOWN_AST.convert(self.text)
+        linkpaths = self.get_linkpaths(ast["children"])
+        path = self.path
+        for link in linkpaths:
+            BACKLINKS[link].remove(path)
 
     def put_recent(self):
         "Put this note at the head of the recently modified notes."
@@ -375,7 +410,6 @@ def setup():
     traverser = ROOT.traverse()
     next(traverser)             # Skip the root Note.
     RECENT.extend([next(traverser) for n in range(RECENT.maxlen)])
-    print(RECENT)
     for note in traverser:
         current = list(RECENT)
         for pos, recent in enumerate(current):
@@ -391,11 +425,7 @@ def setup():
     except OSError:
         pass
     for note in ROOT.traverse():
-        ast = MARKDOWN_AST.convert(note.text)
-        notelinks = note.get_notelinks(ast["children"])
-        path = note.path
-        for link in notelinks:
-            BACKLINKS.setdefault(link, set()).add(path)
+        note.add_backlinks()
 
 @app.context_processor
 def setup_template_context():
