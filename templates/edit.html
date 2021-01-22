@@ -10,6 +10,14 @@
 </div>
 {% endblock %} {# block navbar #}
 
+{% block meta %}
+<button class="btn btn-clipboard btn-outline-none ps-0"
+        data-clipboard-text="[[{{ note.path }}]]">
+  <span class="bi-clipboard text-dark"></span>
+</button>
+<small>{{ note.modified | localtime }}</small>
+{% endblock %}
+
 {% block left %}
 {% include 'starred.html' %}
 {% include 'recent.html' %}

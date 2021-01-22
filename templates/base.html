@@ -27,17 +27,19 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="top_navbar">
-          <ul class="navbar-nav me-auto ms-md-4">
+          <ul class="navbar-nav ms-md-3">
             <li class="nav-item">
               <a href="#"
                  class="nav-link active">Tags</a>
             </li>
           </ul>
-          {% block navbar %}
-          {% endblock %}
+          <div class="navbar-nav me-auto">
+            {% block navbar %}
+            {% endblock %}
+          </div>
           <form action="#"
-                class="d-flex">
-            <input class="form-control me-2" type="search"
+                class="d-flex my-sm-1">
+            <input class="form-control mx-md-2" type="search"
                    placeholder="Search" aria-label="Search">
           </form>
         </div>

@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 import collections
 import json
@@ -199,7 +199,7 @@ class Note:
     def write(self):
         "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
-            abspath = os.path.join(self.abspath, "__dir__.md")
+            abspath = os.path.join(self.abspath, "__text__.md")
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
         else:
@@ -215,7 +215,7 @@ class Note:
         if os.path.exists(abspath):
             # It's a directory with subnotes.
             try:
-                filepath = os.path.join(abspath, "__dir__.md")
+                filepath = os.path.join(abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
                 self.modified = os.path.getmtime(filepath)
@@ -259,7 +259,7 @@ class Note:
         if os.path.isfile(f"{self.abspath}.md"):
             abspath = self.abspath
             os.mkdir(abspath)
-            os.rename(f"{abspath}.md", os.path.join(abspath, "__dir__.md"))
+            os.rename(f"{abspath}.md", os.path.join(abspath, "__text__.md"))
         note = Note(self, title)
         note.text = text        # This parses for backlinks.
         self.subnotes.sort()
@@ -285,10 +285,15 @@ class Note:
         self.star(remove=True)
         os.remove(f"{self.abspath}.md")
         self.supernote.subnotes.remove(self)
-        # Convert supernote to file if no subnotes any longer.
-        if self.supernote.count == 0:
+        # Convert supernote to file if no subnotes any longer. Not root.
+        if self.supernote.count == 0 and self.supernote is not None:
             abspath = self.supernote.abspath
-            os.rename(os.path.join(abspath, "__dir__.md"), f"{abspath}.md")
+            filepath = os.path.join(abspath, "__text__.md")
+            try:
+                os.rename(filepath, f"{abspath}.md")
+            except OSError:     # May happen if dir/files created externally.
+                with open(f"{abspath}.md", "w") as outfile:
+                    outfile.write(sels.supernote.text)
             os.rmdir(abspath)
 
     def get_tree(self):
@@ -367,14 +372,10 @@ def setup():
         if note.supernote is None: continue # Do not include root note.
         note.add()
     RECENT = collections.deque(maxlen=SETTINGS["MAX_RECENT"])
-    notes = []
     traverser = ROOT.traverse()
-    for note in traverser:
-        notes.append(note)
-        if len(notes) >= RECENT.maxlen:
-            break
-    notes.sort(key=lambda n: n.modified, reverse=True)
-    RECENT.extend(notes)
+    next(traverser)             # Skip the root Note.
+    RECENT.extend([next(traverser) for n in range(RECENT.maxlen)])
+    print(RECENT)
     for note in traverser:
         current = list(RECENT)
         for pos, recent in enumerate(current):
@@ -395,8 +396,6 @@ def setup():
         path = note.path
         for link in notelinks:
             BACKLINKS.setdefault(link, set()).add(path)
-    print(json.dumps(dict([(k, list(v)) for k, v in BACKLINKS.items()]),
-                     indent=2))
 
 @app.context_processor
 def setup_template_context():
