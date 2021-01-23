@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 import collections
 import json
@@ -217,9 +217,10 @@ class Note:
     def write(self):
         "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
-            abspath = os.path.join(self.abspath, "__text__.md")
-            with open(abspath, "w") as outfile:
-                outfile.write(self.text)
+            if self.text:       # Only write dir text if anything to write.
+                abspath = os.path.join(self.abspath, "__text__.md")
+                with open(abspath, "w") as outfile:
+                    outfile.write(self.text)
         else:
             abspath = f"{self.abspath}.md"
             with open(abspath, "w") as outfile:
@@ -238,7 +239,7 @@ class Note:
                     self._text = infile.read()
                     self._ast = None
                 self.modified = os.path.getmtime(filepath)
-            except OSError:
+            except OSError:     # No text file for dir.
                 self._text = ""
                 self._ast = None
                 self.modified = os.path.getmtime(abspath)
@@ -373,20 +374,10 @@ class Note:
             filepath = os.path.join(abspath, "__text__.md")
             try:
                 os.rename(filepath, f"{abspath}.md")
-            except OSError:     # May happen if dir/files created externally.
+            except OSError:     # May happen if e.g. no text for dir.
                 with open(f"{abspath}.md", "w") as outfile:
                     outfile.write(sels.supernote.text)
             os.rmdir(abspath)
-
-    def get_tree(self):
-        "Get the note contents as a dict."
-        result = {"title": self.title,
-                  "path": self.path,
-                  "text": self.text,
-                  "subnotes": [s.get_tree() for s in self.subnotes]}
-        if self.supernote:
-            result["supernote"] = self.supernote.path
-        return result
 
 
 class Timer:
@@ -519,7 +510,7 @@ def setup():
 def put_recent(note):
     "Put the note to the start of the list of recently modified notes."
     # Root note should not be listed.
-    if note.supernote is not None: return
+    if note.supernote is None: return
     try:
         RECENT.remove(note)
     except ValueError:
@@ -617,8 +608,12 @@ def edit(path=""):
     try:
         note = LOOKUP[path]
     except KeyError:
-        flash_error(f"No such note: '{path}'")
-        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+        if not path:
+            note = ROOT
+        else:
+            flash_error(f"No such note: '{path}'")
+            return flask.redirect(
+                flask.url_for("note", path=os.path.dirname(path)))
 
     if flask.request.method == "GET":
         return flask.render_template("edit.html", note=note)
