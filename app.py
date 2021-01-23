@@ -1,10 +1,9 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.4.0"
+__version__ = "0.4.2"
 
 import collections
 import json
-import logging
 import os
 import time
 
@@ -72,10 +71,8 @@ class Note:
                                    title)
         if os.path.exists(new_abspath): raise KeyError
         if os.path.exists(f"{new_abspath}.md"): raise KeyError
-        print("old title:", self.title, "new title:", title)
         # The set of notes whose paths will change: this one and all below it.
         changing = list(self.traverse())
-        print("changing:", changing)
         # The set of notes which link to any of these changed-path notes.
         affected = set()
         for note in changing:
@@ -99,11 +96,9 @@ class Note:
         self._title = title
         if os.path.isdir(old_abspath):
             abspath = self.abspath
-            print("rename dir:", old_abspath, abspath)
             os.rename(old_abspath, abspath)  # New abspath
         else:
             abspath = f"{self.abspath}.md"
-            print("rename file:", f"{old_abspath}.md", abspath)
             os.rename(f"{old_abspath}.md", abspath)
         # Update modified timestamp and add note to recently changed.
         self.modified = os.path.getmtime(abspath)
@@ -394,6 +389,27 @@ class Note:
         return result
 
 
+class Timer:
+    "CPU timer, wall-clock timer."
+
+    def __init__(self):
+        self.cpu_start = time.process_time()
+        self.wallclock_start = time.time()
+
+    def __str__(self):
+        return f"CPU time: {self.cpu_time:.3f} s, wall-clock time: {self.wallclock_time:.3f} s"
+
+    @property
+    def cpu_time(self):
+        "Return CPU time (in seconds) since start of this timer."
+        return time.process_time() - self.cpu_start
+
+    @property
+    def wallclock_time(self):
+        "Return wall-clock time (in seconds) since start of this timer."
+        return time.time() - self.wallclock_start
+
+
 class NoteLink(marko.inline.InlineElement):
     pattern = r'\[\[ *(.+?) *\]\]'
     parse_children = False
@@ -469,6 +485,8 @@ def setup():
     - Set up map of backlinks
     - Set up map of hashtags
     """
+    app.logger.debug(f"Settings file: {SETTINGS['SETTINGS_FILEPATH']}")
+    timer = Timer()
     global ROOT
     global RECENT
     # Read in all notes, add to the path->note lookup.
@@ -496,8 +514,7 @@ def setup():
     for note in ROOT.traverse():
         note.add_backlinks()
         note.add_hashtags()
-    for word, notes in HASHTAGS.items():
-        print(word, notes)
+    app.logger.debug(f"Setup {timer}")
 
 def put_recent(note):
     "Put the note to the start of the list of recently modified notes."
@@ -508,18 +525,13 @@ def put_recent(note):
     except ValueError:
         pass
     RECENT.appendleft(note)
-    assert check_recent()
+    check_recent()
 
 def check_recent():
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
-            print(f"RECENT out of order: '{note}', '{latest}'")
-            for n in RECENT:
-                print(n, localtime(n.modified))
-            return False
-        latest = note
-    return True
+            raise ValueError(f"RECENT out of order: '{note}', '{latest}'")
 
 @app.context_processor
 def setup_template_context():
@@ -672,7 +684,6 @@ if __name__ == "__main__":
         with open(filepath) as infile:
             SETTINGS.update(json.load(infile))
         SETTINGS["SETTINGS_FILEPATH"] = filepath
-        logging.info(f"Settings file: {filepath}")
     except OSError:
         SETTINGS["SETTINGS_FILEPATH"] = None
     SETTINGS["NOTES_DIRPATH"] = dirpath

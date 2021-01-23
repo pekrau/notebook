@@ -3,39 +3,41 @@
 {% block head_title %}#{{ word }}{% endblock %}
 {% block body_title %}<i>#{{ word }}</i>{% endblock %}
 
-{% block main %}
-{% if notes %}
-<table class="table table-sm table-responsive">
-  <thead>
-    <tr>
-      <th></th>
-      <th width="50%">Note</th>
-      <th>Modified</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for note in notes %}
-    <tr>
-      <td class="text-end">
-        {% if note.supernote.path %}
-        {{ note.supernote.path }}/
-        {% endif %}
-      </td>
-      <td>
-        <a href="{{ note.url }}" class="text-decoration-none">
-          {{ note.title }}</a>
-      </td>
-      <td class="small">{{ note.modified | localtime }}</td>
-    </tr>
-    {% endfor %} {# for note in notes #}
-  </tbody>
-</table>
+{% block left_main %}
+<div class="col-md-10">
+  {% if notes %}
+  <table class="table table-sm table-responsive">
+    <thead>
+      <tr>
+        <th width="30%"></th>
+        <th width="50%">Note</th>
+        <th>Modified</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for note in notes %}
+      <tr>
+        <td class="text-end">
+          {% if note.supernote.path %}
+          {{ note.supernote.path }}/
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ note.url }}" class="text-decoration-none">
+            {{ note.title }}</a>
+        </td>
+        <td class="small">{{ note.modified | localtime }}</td>
+      </tr>
+      {% endfor %} {# for note in notes #}
+    </tbody>
+  </table>
 
-{% else %}
-<p class="lead">No such tag.</p>
-{% endif %} {# if notes #}
+  {% else %}
+  <p class="lead">No such tag.</p>
+  {% endif %} {# if notes #}
 
-{% endblock %} {# block main #}
+</div>
+{% endblock %} {# block left_main #}
 
 {% block right %}
 {% if interactive %}

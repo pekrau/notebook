@@ -88,6 +88,7 @@
 
       {% block supermain %}
       <div class="row">
+        {% block left_main %}
         <div class="col-md-2">
           {% block left %}
           {% endblock %}
@@ -96,13 +97,10 @@
           {% block main %}
           {% endblock %}
         </div>
+        {% endblock %} {# block left_main #}
         <div class="col-md-2">
-          <div>
-            {% block right %}
-            {% endblock %}
-          </div>
-          <div>
-          </div>
+          {% block right %}
+          {% endblock %}
         </div>
       </div>
       {% endblock %} {# block supermain #}
