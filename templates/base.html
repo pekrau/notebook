@@ -31,11 +31,11 @@
         <div class="collapse navbar-collapse" id="top_navbar">
           <ul class="navbar-nav me-auto">
             <li class="nav-item dropdown">
-              <a href="#" id="tagsDropdown"
+              <a href="#" id="hashtagsDropdown"
                  role="button" data-bs-toggle="dropdown"
                  class="nav-link dropdown-toggle"
                  aria-expanded="false">Hashtags</a>
-              <ul class="dropdown-menu" aria-labelledby="tagsDropdown">
+              <ul class="dropdown-menu" aria-labelledby="hashtagsDropdown">
                 {% for word in get_hashtags() %}
                 <li>
                   <a href="{{ url_for('hashtag', word=word) }}"
