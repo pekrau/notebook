@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 import collections
 import json
@@ -444,8 +444,22 @@ class HashTagExt:
     elements = [HashTag]
     renderer_mixins = [HashTagRendererMixin]
 
-MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt])
-MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt, HashTagExt],
+class BareUrl(marko.inline.InlineElement):
+    pattern = r'(https?://\S+)'
+    parse_children = False
+    def __init__(self, match):
+        self.url = match.group(1)
+
+class BareUrlRendererMixin:
+    def render_bare_url(self, element):
+        return f'<a class="text-decoration-none" href="{element.url}">{element.url}</a>'
+
+class BareUrlExt:
+    elements = [BareUrl]
+    renderer_mixins = [BareUrlRendererMixin]
+
+MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt])
+MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
                               renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
