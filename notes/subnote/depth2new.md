@@ -1,5 +1,5 @@
 Also level 2.
 
-#hashtag
+#hashtag #done
 
 # Title

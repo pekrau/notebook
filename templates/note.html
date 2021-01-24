@@ -3,30 +3,26 @@
 
 {% block head_title %}{{ note.title }}{% endblock %}
 {% block body_title %}
+  <form action="{{ url_for('star', path=note.path) }}" 
+        class="d-inline-flex align-middle"
+        method="POST">
+    {% if note.starred %}
+    <button type="submit" class="btn btn-warning">
+      <span class="bi-star-fill" title="Unstar this note."></span>
+    </button>
+    {% else %}
+    <button type="submit" class="btn btn-outline-warning">
+      <span class="bi-star-fill" title="Star this note."></span>
+    </button>
+    {% endif %}
+  </form>
 {{ note.title }}
 {% endblock %}
 
 {% block navbar %}
 {% if interactive %}
-<form action="{{ url_for('star', path=note.path) }}" 
-      class="d-flex mx-md-2 my-md-0 my-sm-1"
-      method="POST">
-  {% if note.starred %}
-  <button type="submit" class="btn btn-warning">
-    <span class="bi-star-fill" title="Unstar this note."></span>
-  </button>
-  {% else %}
-  <button type="submit" class="btn btn-outline-warning">
-    <span class="bi-star-fill" title="Star this note."></span>
-  </button>
-  {% endif %}
-</form>
-<div class="d-flex mx-md-2 my-md-0 my-sm-1">
-  <a href="{{ url_for('edit', path=note.path) }}"
-     class="btn btn-outline-primary px-md-4">Edit</a>
-</div>
 <form action="{{ url_for('create') }}"
-      class="d-flex mx-md-2 my-md-0 my-sm-1"
+      class="mx-md-2 my-md-0"
       method="GET">
   {% if note.supernote %}
   <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
@@ -36,7 +32,7 @@
           title="Create a copy of this note.">Copy</button>
 </form>
 <form action="{{ url_for('create') }}"
-      class="d-flex mx-md-2 my-md-0 my-sm-1"
+      class="mx-md-2 my-md-0"
       method="GET">
   {% if note.path %}
   <input type="hidden" name="supernote" value="{{ note.path }}">
@@ -45,7 +41,7 @@
           title="Create a subnote for this note.">Subnote</button>
 </form>
 <form action="{{ url_for('delete', path=note.path) }}"
-      class="d-flex mx-md-2 my-md-0 my-sm-1"
+      class="mx-md-2 my-md-0"
       method="POST">
   <button role="submit" class="btn btn-outline-danger"
           {{ not note.is_deletable() and 'disabled' or '' }}
@@ -54,6 +50,15 @@
 </form>
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
+
+{% block action %}
+{% if interactive %}
+<div class="d-grid gap-2">
+  <a href="{{ url_for('edit', path=note.path) }}"
+     class="btn btn-primary mt-2 mx-2">Edit</a>
+</div>
+{% endif %} {# if interactive #}
+{% endblock %} {# block action #}
 
 {% block meta %}
 <button class="btn btn-clipboard btn-outline-none ps-0"

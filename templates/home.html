@@ -6,17 +6,22 @@
 
 {% block navbar %}
 {% if interactive %}
-<div class="d-flex mx-md-2 my-md-0 my-sm-1">
-  <a href="{{ url_for('edit', path='') }}"
-     class="btn btn-outline-primary px-md-4">Edit</a>
-</div>
-<form action="{{ url_for('create') }}" class="d-flex me-2"
+<form action="{{ url_for('create') }}" class="me-md-2"
       method="GET">
   <button type="submit" class="btn btn-outline-primary"
           title="Create a subnote for this note.">Subnote</button>
 </form>
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
+
+{% block action %}
+{% if interactive %}
+<div class="d-grid gap-2 mb-md-3">
+  <a href="{{ url_for('edit', path='') }}"
+     class="btn btn-primary mt-2">Edit</a>
+</div>
+{% endif %} {# if interactive #}
+{% endblock %} {# block action #}
 
 {% block left %}
 <div class="card mb-3">

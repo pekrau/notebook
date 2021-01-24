@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block head_title %}Search{% endblock %}
+{% block body_title %}Search{% endblock %}
+
+{% block left_main %}
+<div class="col-md-10">
+  <div class="row mb-3">
+    <div class="col-md-10 offset-md-2">
+      <form action="{{ url_for('search') }}"
+            class="row row-cols-md-auto align-items-center">
+        <div class="col-12 my-sm-2">
+          <input type="search" name="terms"
+                 class="form-control" size="30"
+                 placeholder="Search" aria-label="Search"
+                 value="{{ terms or '' }}">
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% include 'notes.html' %}
+</div>
+{% endblock %} {# block left_main #}
+
+{% block right %}
+{% if interactive %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
+{% endif %} {# if interactive #}
+{% endblock %} {# block right #}

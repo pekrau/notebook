@@ -1,0 +1,31 @@
+{# Table of notes #}
+
+<table class="table table-sm table-hover table-responsive"
+       data-toggle="table"
+       data-search="true"
+       data-show-columns="true"
+       data-pagination="true">
+  <thead>
+    <tr>
+      <th width="30%"></th>
+      <th width="50%">Note</th>
+      <th>Modified</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for note in notes %}
+    <tr>
+      <td class="text-end">
+        {% if note.supernote.path %}
+        {{ note.supernote.path }}/
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ note.url }}" class="text-decoration-none">
+          {{ note.title }}</a>
+      </td>
+      <td class="small">{{ note.modified | localtime }}</td>
+    </tr>
+    {% endfor %} {# for note in notes #}
+  </tbody>
+</table>

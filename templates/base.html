@@ -11,6 +11,8 @@
       crossorigin="anonymous">
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    {% block css %}
+    {% endblock %}
   </head>
   <body>
     <nav class="navbar navbar-expand-md navbar-light bg-light">
@@ -27,7 +29,7 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="top_navbar">
-          <ul class="navbar-nav mx-md-3">
+          <ul class="navbar-nav me-auto">
             <li class="nav-item dropdown">
               <a href="#" id="tagsDropdown"
                  role="button" data-bs-toggle="dropdown"
@@ -43,14 +45,13 @@
               </ul>
             </li>
           </ul>
-          <div class="navbar-nav me-auto">
-            {% block navbar %}
-            {% endblock %}
-          </div>
-          <form action="#"
-                class="d-flex my-sm-1">
-            <input class="form-control mx-md-2" type="search"
-                   placeholder="Search" aria-label="Search">
+          {% block navbar %}
+          {% endblock %}
+          <form action="{{ url_for('search') }}"
+                class="d-flex">
+            <input name="terms" class="form-control" type="search"
+                   placeholder="Search" aria-label="Search"
+                   value="{{ terms or '' }}">
           </form>
         </div>
       </div>
@@ -58,7 +59,11 @@
 
     <div class="container-fluid">
       <div class="row">
-        <div class="col-md-8 offset-md-2">
+        <div class="col-md-2">
+          {% block action %}
+          {% endblock %}
+        </div>
+        <div class="col-md-8">
           <h1>{% block body_title %}notes{% endblock %}</h1>
         </div>
         <div class="col-md-2 py-1">
@@ -80,7 +85,7 @@
           {% endfor %}
           {% for msg in get_flashed_messages(category_filter=['message']) %}
           <div class="alert alert-info" role="alert">
-            <strong>Message:</strong> {{ msg }}
+            {{ msg }}
           </div>
           {% endfor %}
         </div>

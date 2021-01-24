@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.4.3"
+__version__ = "0.5.0"
 
 import collections
 import json
@@ -48,6 +48,13 @@ class Note:
 
     def __lt__(self, other):
         return self.title < other.title
+
+    def __contains__(self, term):
+        "Does this note contain the search term?"
+        term = term.lower()
+        if term in self._title.lower(): return True
+        if term in self._text.lower(): return True
+        return False
 
     def get_title(self):
         return self._title
@@ -505,7 +512,7 @@ def setup():
     for note in ROOT.traverse():
         note.add_backlinks()
         note.add_hashtags()
-    app.logger.debug(f"Setup {timer}")
+    flash_message(f"Setup {timer}")
 
 def put_recent(note):
     "Put the note to the start of the list of recently modified notes."
@@ -662,6 +669,32 @@ def hashtag(word):
     notes = [LOOKUP[p] for p in HASHTAGS.get(word, [])]
     return flask.render_template("hashtag.html", word=word, notes=notes)
 
+@app.route("/search")
+def search():
+    terms = flask.request.values.get("terms") or ""
+    if terms:
+        terms = terms.strip()
+        if (terms[0] == '"' and terms[-1] == '"') or \
+           (terms[0] == "'" and terms[-1] == "'"):
+            terms = [terms[1:-1]]   # Quoted term; search as a whole
+        else:
+            terms = terms.split()
+        terms.sort(key=lambda t: len(t), reverse=True)
+        notes = []
+        traverser = ROOT.traverse()
+        next(traverser)             # Skip root note.
+        timer = Timer()
+        for note in traverser:
+            for term in terms:
+                if term not in note: break
+            else:
+                notes.append(note)
+        flash_message(f"Search {timer}")
+    else:
+        notes = []
+    return flask.render_template("search.html",
+                                 notes=sorted(notes),
+                                 terms=flask.request.values.get("terms"))
 
 if __name__ == "__main__":
     import sys
