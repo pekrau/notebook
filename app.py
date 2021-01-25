@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.5.4"
+__version__ = "0.5.6"
 
 import collections
 import glob
@@ -416,6 +416,8 @@ class Note:
         self.remove_hashtags()
         self.star(remove=True)
         os.remove(f"{self.abspath}.md")
+        if self.filename:
+            os.remove(self.absfilepath)
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer. Not root!
         if self.supernote.count == 0 and self.supernote is not None:
