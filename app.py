@@ -1,11 +1,12 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.6.0"
+__version__ = "0.6.2"
 
 import collections
 import glob
 import json
 import os
+import sys
 import time
 
 import flask
@@ -21,14 +22,32 @@ RECENT = None         # Created in 'setup'
 BACKLINKS = dict()    # target note path -> set of source target paths
 HASHTAGS = dict()     # word -> set of note paths
 
-SETTINGS = dict(VERSION = __version__,
-                SERVER_NAME = "localhost:5099",
-                SECRET_KEY = "this is a secret key",
-                TEMPLATES_AUTO_RELOAD = True,
-                DEBUG = True,
-                JSON_AS_ASCII = False,
-                NOTES_DIRPATH = "notes",
-                MAX_RECENT = 12)
+
+def get_settings(dirpath):
+    "Determine the notes directory and retun the settings."
+    if not os.path.exists(dirpath):
+        raise ValueError(f"No such directory: {dirpath}")
+    if not os.path.isdir(dirpath):
+        raise ValueError(f"Not a directory: {dirpath}")
+    settings = dict(VERSION = __version__,
+                    SERVER_NAME = "localhost:5099",
+                    SECRET_KEY = "this is a secret key",
+                    TEMPLATES_AUTO_RELOAD = True,
+                    DEBUG = True,
+                    JSON_AS_ASCII = False,
+                    NOTES_DIRPATH = "notes",
+                    IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg"],
+                    MAX_RECENT = 12)
+    try:
+        filepath = os.path.join(dirpath, ".settings.json")
+        with open(filepath) as infile:
+            settings.update(json.load(infile))
+        settings["SETTINGS_FILEPATH"] = filepath
+    except OSError:
+        settings["SETTINGS_FILEPATH"] = None
+    settings["NOTES_DIRPATH"] = dirpath
+    settings["HOME_TITLE"] = os.path.basename(dirpath)
+    return settings
 
 
 class Note:
@@ -76,7 +95,7 @@ class Note:
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
         if self._title == title: return
-        new_abspath = os.path.join(SETTINGS["NOTES_DIRPATH"],
+        new_abspath = os.path.join(flask.current_app.config["NOTES_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
@@ -149,6 +168,7 @@ class Note:
         self.add_backlinks()
         self.add_hashtags()
         self.write()
+        # print(json.dumps(self.ast, indent=2))
 
     text = property(get_text, set_text,
                     doc="The text of the note using Markdown format.")
@@ -178,9 +198,9 @@ class Note:
         "Return the absolute filepath of the note."
         path = self.path
         if path:
-            return  os.path.join(SETTINGS["NOTES_DIRPATH"], path)
+            return os.path.join(flask.current_app.config["NOTES_DIRPATH"], path)
         else:
-            return SETTINGS["NOTES_DIRPATH"]
+            return flask.current_app.config["NOTES_DIRPATH"]
 
     @property
     def absfilepath(self):
@@ -219,7 +239,8 @@ class Note:
             STARRED.add(self)
         else:
             return              # No change; no need to update file.
-        filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
+        filepath = os.path.join(flask.current_app.config["NOTES_DIRPATH"],
+                                "__starred__.json")
         with open(filepath, "w") as outfile:
             json.dump({"paths": [n.path for n in STARRED]}, outfile)
 
@@ -250,11 +271,14 @@ class Note:
                 abspath = os.path.join(self.abspath, "__text__.md")
                 with open(abspath, "w") as outfile:
                     outfile.write(self.text)
+                self.modified = os.path.getmtime(abspath)
+            else:
+                self.modified = os.path.getmtime(self.abspath)
         else:
             abspath = f"{self.abspath}.md"
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
-        self.modified = os.path.getmtime(abspath)
+            self.modified = os.path.getmtime(abspath)
         put_recent(self)
 
     def upload_file(self, content, extension):
@@ -297,11 +321,11 @@ class Note:
                 filepath = os.path.join(abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
-                    self._ast = None
+                    self._ast = None  # Remove the AST cache.
                 self.modified = os.path.getmtime(filepath)
-            except OSError:     # No text file for dir.
+            except OSError:           # No text file for dir.
                 self._text = ""
-                self._ast = None
+                self._ast = None      # Remove the AST cache.
                 self.modified = os.path.getmtime(abspath)
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
@@ -317,7 +341,7 @@ class Note:
             filepath = f"{abspath}.md"
             with open(filepath) as infile:
                 self._text = infile.read()
-                self._ast = None
+                self._ast = None      # Remove the AST cache.
             self.modified = os.path.getmtime(filepath)
         # Both directory (except root) and file note may have
         # an attachment, which would be a single file at the
@@ -525,7 +549,14 @@ class BareUrlExt:
     elements = [BareUrl]
     renderer_mixins = [BareUrlRendererMixin]
 
-MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt])
+class HTMLRenderer(marko.html_renderer.HTMLRenderer):
+    "Fix various output for Bootstrap."
+
+    def render_quote(self, element):
+        return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(self.render_children(element))
+
+MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
+                          renderer=HTMLRenderer)
 MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
                               renderer=marko.ast_renderer.ASTRenderer)
 
@@ -564,7 +595,7 @@ def setup():
     - Set up map of backlinks
     - Set up map of hashtags
     """
-    app.logger.debug(f"Settings file: {SETTINGS['SETTINGS_FILEPATH']}")
+    app.logger.debug(f"Settings file: {flask.current_app.config['SETTINGS_FILEPATH']}")
     timer = Timer()
     global ROOT
     global RECENT
@@ -578,13 +609,14 @@ def setup():
     # Set up most recently modified notes.
     traverser = ROOT.traverse()
     next(traverser)             # Skip root note.
-    notes = list(traverser)     # XXX simple but not very good
+    notes = list(traverser)     # XXX simple but not very good.
     notes.sort(key=lambda n: n.modified, reverse=True)
-    RECENT = collections.deque(notes[:SETTINGS["MAX_RECENT"]],
-                               maxlen=SETTINGS["MAX_RECENT"])
+    RECENT = collections.deque(notes[:flask.current_app.config["MAX_RECENT"]],
+                               maxlen=flask.current_app.config["MAX_RECENT"])
     # Get the starred notes.
     try:
-        filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
+        filepath = os.path.join(flask.current_app.config["NOTES_DIRPATH"], 
+                                "__starred__.json")
         with open(filepath) as infile:
             for path in json.load(infile)["paths"]:
                 try:
@@ -627,6 +659,10 @@ def setup_template_context():
                 get_recent=get_recent,
                 get_hashtags=get_hashtags)
 
+@app.before_request
+def prepare():
+    "Add stuff to the 'g' object."
+    flask.g.config = flask.current_app.config
 
 @app.route("/")
 def home():
@@ -812,23 +848,13 @@ def search():
                                  terms=flask.request.values.get("terms"))
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) > 1:
-        dirpath = os.path.expanduser(sys.argv[1])
-        dirpath = os.path.normpath(dirpath)
+        dirpath = os.path.normpath(os.path.expanduser(sys.argv[1]))
     else:
         dirpath = os.path.join(os.getcwd(), "notes")
-    if not os.path.exists(dirpath):
-        sys.exit(f"No such directory: {dirpath}")
-    if not os.path.isdir(dirpath):
-        sys.exit(f"Not a directory: {dirpath}")
     try:
-        filepath = os.path.join(dirpath, ".settings.json")
-        with open(filepath) as infile:
-            SETTINGS.update(json.load(infile))
-        SETTINGS["SETTINGS_FILEPATH"] = filepath
-    except OSError:
-        SETTINGS["SETTINGS_FILEPATH"] = None
-    SETTINGS["NOTES_DIRPATH"] = dirpath
-    app.config.from_mapping(SETTINGS)
-    app.run(debug=True)
+        settings = get_settings(dirpath)
+    except ValueError as error:
+        sys.exit(str(error))
+    app.config.from_mapping(settings)
+    app.run(debug=settings["DEBUG"])

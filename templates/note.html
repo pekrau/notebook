@@ -88,9 +88,10 @@
 {% block main %}
 {{ note['text'] | markdown }}
 {% if note.filename %}
-{% if note.file_extension in [".png", ".PNG", ".jpg"] %}
+{% if note.file_extension.lower() in g.config['IMAGE_EXTENSIONS'] %}
 <div class="my-md-2">
-  <img src="{{ url_for('file', path=note.path) }}">
+  <img src="{{ url_for('file', path=note.path) }}"
+       class="border border-secondary">
 </div>
 {% endif %}
 <a href="{{ url_for('file', path=note.path, download=True) }}"
@@ -111,6 +112,6 @@
 {% block javascript %}
 <script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
 <script>
- var clipboard = new ClipboardJS('.btn-clipboard');
+  var clipboard = new ClipboardJS('.btn-clipboard');
 </script>
 {% endblock %}

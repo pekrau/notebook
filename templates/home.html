@@ -1,8 +1,11 @@
 {% extends 'base.html' %}
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}notes &lt;root&gt;{% endblock %}
-{% block body_title %}notes <i>&lt;root&gt;</i>{% endblock %}
+{% block head_title %}notes {{ g.config['HOME_TITLE'] }}{% endblock %}
+{% block body_title %}
+<small class="text-muted small">notes</small>
+{{ g.config['HOME_TITLE'] }}
+{% endblock %}
 
 {% block navbar %}
 {% if interactive %}
