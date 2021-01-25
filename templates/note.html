@@ -45,6 +45,16 @@
   <button type="submit" class="btn btn-outline-primary"
           title="Create a subnote for this note.">Subnote</button>
 </form>
+<form action="{{ url_for('create') }}"
+      class="mx-md-2 my-md-0"
+      method="GET">
+  {% if note.path %}
+  <input type="hidden" name="supernote" value="{{ note.path }}">
+  {% endif %}
+  <input type="hidden" name="upload" value="true">
+  <button type="submit" class="btn btn-outline-primary"
+          title="Upload a file as a subnote for this note.">Upload</button>
+</form>
 <form action="{{ url_for('delete', path=note.path) }}"
       class="mx-md-2 my-md-0"
       method="POST">
@@ -70,56 +80,24 @@
 {% endblock %}
 
 {% block left %}
-<div class="card bg-light my-3">
-  <div class="card-header py-1">Supernotes</div>
-  <div class="card-body py-1">
-    <ul class="list-unstyled my-0">
-      <li>
-        <a href="{{ url_for('home') }}" class="text-decoration-none">
-          <i>&lt;root&gt;</i></a>
-      </li>
-      {% for supernote in note.supernotes()[1:] %}
-      <li>
-        <a href="{{ supernote.url }}" class="text-decoration-none">
-          /{{ supernote.title }}</a>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
-{% if note.supernote %}
-<div class="card my-3">
-  <div class="card-header bg-info py-1">Sibling notes</div>
-  <div class="card-body small py-1">
-    <table width="100%">
-      {% for sibling in note.supernote.subnotes %}
-      <tr>
-        <td class="py-0">
-          {% if sibling == note %}
-          <span class="text-muted">{{ sibling.title }}</span>
-          {% else %}
-          <a href="{{ sibling.url }}" class="text-decoration-none">
-            {{ sibling.title }}</a>
-          {% endif %}
-        </td>
-        <td class="text-end py-0">
-          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
-                  data-clipboard-text="[[{{ sibling.path }}]]"
-                  title="Copy the path of the note to the clipboard.">
-            <span class="bi-clipboard text-dark"></span>
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-</div>
-{% endif %} {# if note.supernote #}
+{% include 'supernotes.html' %}
+{% include 'siblings.html' %}
 {% include 'backlinks.html' %}
 {% endblock %} {# block left #}
 
 {% block main %}
 {{ note['text'] | markdown }}
+{% if note.filename %}
+{% if note.file_extension in [".png", ".jpg"] %}
+<div class="my-md-2">
+  <img src="{{ url_for('file', path=note.path) }}">
+</div>
+{% endif %}
+<a href="{{ url_for('file', path=note.path, download=True) }}"
+   class="btn btn-primary my-lg-2">
+  Download file {{ note.filesize | filesizeformat }}
+</a>
+{% endif %}
 {{ macros.noteslist(note.subnotes, 2) }}
 {% endblock %} {# block main #}
 

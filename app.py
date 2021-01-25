@@ -1,8 +1,9 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.5.2"
+__version__ = "0.5.4"
 
 import collections
+import glob
 import json
 import os
 import time
@@ -41,6 +42,8 @@ class Note:
         self._title = title
         self._text = ""
         self._ast = None
+        self.filename = None
+        self.filesize = None
         self.modified = None
 
     def __repr__(self):
@@ -173,6 +176,18 @@ class Note:
             return SETTINGS["NOTES_DIRPATH"]
 
     @property
+    def absfilepath(self):
+        if not self.filename:
+            raise ValueError("No file attached to this note.")
+        return self.abspath + self.file_extension
+
+    @property
+    def file_extension(self):
+        if not self.filename:
+            raise ValueError("No file attached to this note.")
+        return os.path.splitext(self.filename)[1]
+
+    @property
     def url(self):
         if self.path:
             return flask.url_for("note", path=self.path)
@@ -221,7 +236,7 @@ class Note:
         for subnote in self.subnotes:
             yield from subnote.traverse()
 
-    def write(self):
+    def write(self, upload=None):
         "Write this note to disk. Does *not* write subnotes."
         if os.path.isdir(self.abspath):
             if self.text:       # Only write dir text if anything to write.
@@ -233,6 +248,21 @@ class Note:
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
         self.modified = os.path.getmtime(abspath)
+        if upload and self is not ROOT:
+            extension = os.path.splitext(upload.filename)[1]
+            # Uploading Markdown files would create havoc.
+            if extension == ".md":
+                raise ValueError("Upload of '.md' files is not allowed.")
+            # On the safe side: non-extension upload must have some extension.
+            elif not extension:
+                extension = ".bin"
+            filename = self.title + extension
+            filepath = os.path.join(self.supernote.abspath, filename)
+            content = upload.read()
+            with open(filepath, "wb") as outfile:
+                outfile.write(content)
+            self.filename = filename
+            self.filesize = len(content)
         put_recent(self)
 
     def read(self):
@@ -254,7 +284,10 @@ class Note:
                 if filename.startswith("."): continue
                 if filename.startswith("_"): continue
                 if filename.endswith("~"): continue
-                note = Note(self, os.path.splitext(filename)[0])
+                basename, extension = os.path.splitext(filename)
+                # Skip attachment files.
+                if extension and extension != ".md": continue
+                note = Note(self, basename)
                 note.read()
         else:
             # It's a file; no subnotes.
@@ -263,6 +296,15 @@ class Note:
                 self._text = infile.read()
                 self._ast = None
             self.modified = os.path.getmtime(filepath)
+        # Both directory (except root) and file note may have
+        # an attachment, which would be a single file at the
+        # same level with the same name, but a non-md extension.
+        if self.supernote:
+            filepaths = [p for p in glob.glob(f"{self.abspath}.*")
+                         if not p.endswith(".md")]
+            if filepaths:
+                self.filename = os.path.basename(filepaths[0]) # Just one file!
+                self.filesize = os.stat(filepaths[0]).st_size
 
     def add_lookup(self):
         "Add the note to the path->note lookup."
@@ -340,7 +382,7 @@ class Note:
                     pass
         return result
 
-    def create_subnote(self, title, text):
+    def create_subnote(self, title, text, upload=None):
         "Create and return a subnote."
         if title in self.subnotes:
             raise ValueError(f"Note already exists: '{title}'")
@@ -351,7 +393,7 @@ class Note:
         note = Note(self, title)
         note.text = text        # This also adds backlinks.
         self.subnotes.sort()
-        note.write()
+        note.write(upload=upload)
         note.add_lookup()
         return note
 
@@ -519,7 +561,11 @@ def setup():
     try:
         filepath = os.path.join(SETTINGS["NOTES_DIRPATH"], "__starred__.json")
         with open(filepath) as infile:
-            STARRED.update([LOOKUP[p] for p in json.load(infile)["paths"]])
+            for path in json.load(infile)["paths"]:
+                try:
+                    STARRED.add(LOOKUP[path])
+                except KeyError:
+                    pass
     except OSError:
         pass
     # Set up the backlinks and hashtags for all notes.
@@ -571,7 +617,7 @@ def root():
 
 @app.route("/create", methods=["GET", "POST"])
 def create():
-    "Create a new note."
+    "Create a new note, optionally with an uploaded file."
     if flask.request.method == "GET":
         try:
             supernote = LOOKUP[flask.request.values["supernote"]]
@@ -583,7 +629,8 @@ def create():
             source = None
         return flask.render_template("create.html",
                                      supernote=supernote,
-                                     source=source)
+                                     source=source,
+                                     upload=flask.request.values.get("upload"))
 
     elif flask.request.method == "POST":
         try:
@@ -595,18 +642,21 @@ def create():
             try:
                 supernote = LOOKUP[superpath]
             except KeyError:
-                raise
                 flash_error(f"No such supernote: '{superpath}'")
                 return flask.redirect(flask.url_for("home"))
-        title = flask.request.form.get("title") or "No title"
+        upload = flask.request.files.get("upload")
+        if upload and supernote is not ROOT:
+            title = os.path.splitext(os.path.basename(upload.filename))[0]
+        else:
+            title = flask.request.form.get("title") or "No title"
         title = title.replace("\n", " ")  # Clean up title.
-        title = title.replace("/", " ")
+        title = title.replace("/", " ")   # Avoid confusion with subnotes.
         title = title.strip()
-        title = title.lstrip(".")
-        title = title.lstrip("_")
+        title = title.replace(".", "_")   # Avoid confusion with extensions.
+        title = title.lstrip("_")         # Avoid confusion with system files.
         text = flask.request.form.get("text") or ""
         try:
-            note = supernote.create_subnote(title=title, text=text)
+            note = supernote.create_subnote(title, text, upload=upload)
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
@@ -621,6 +671,22 @@ def note(path):
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     return flask.render_template("note.html", note=note)
+
+@app.route("/file/<path:path>")
+def file(path):
+    "Return the file for the given note. Optionally for download."
+    try:
+        note = LOOKUP[path]
+    except KeyError:
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    if not note.filename:
+        raise KeyError(f"No file attached to note '{path}'")
+    if flask.request.values.get("download"):
+        return flask.send_file(note.absfilepath,
+                               attachment_filename=note.filename)
+    else:
+        return flask.send_file(note.absfilepath)
 
 @app.route("/edit/", methods=["GET", "POST"])
 @app.route("/edit/<path:path>", methods=["GET", "POST"])

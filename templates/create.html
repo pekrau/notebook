@@ -1,7 +1,20 @@
 {% extends 'base.html' %}
 
-{% block head_title %}Create a new note{% endblock %}
-{% block body_title %}Create a new note{% endblock %}
+{% block head_title %}
+{% if upload %}
+Upload a file
+{% else %}
+Create a new note
+{% endif %}
+{% endblock %}
+
+{% block body_title %}
+{% if upload %}
+Upload a file
+{% else %}
+Create a new note
+{% endif %}
+{% endblock %}
 
 {% block left %}
 <div class="d-grid gap-2">
@@ -19,6 +32,7 @@
 <div class="card">
   <div class="card-body">
     <form action="{{ url_for('create') }}"
+          enctype="multipart/form-data"
           method="POST">
       <div class="mb-3">
         <label for="supernote" class="col-form-label">Supernote</label>
@@ -32,6 +46,12 @@
                value="<root>">
         {% endif %}
       </div>
+      {% if upload %}
+      <div class="mb-3">
+        <label for="upload" class="form-label">Upload file</label>
+        <input class="form-control" type="file" name="upload">
+      </div>
+      {% else %}
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>
         <input type="text" name="title" id="title" autofocus
@@ -39,10 +59,10 @@
                aria-describedby="titleHelp"
                value="{{ source and ('Copy of ' + source.title) or '' }}">
         <div id="titleHelp" class="form-text">
-          Title of the new note; also used for the filename of the note on
-          disk.
+          Title of the new note; defines the filename of the note on disk.
         </div>
       </div>
+      {% endif %}
       <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
         <textarea name="text" id="text" rows="16"
@@ -54,7 +74,7 @@
         </div>
       </div>
       <div class="mb-3">
-        <button type="submit" class="btn btn-primary px-5">Create</button>
+        <button type="submit" class="btn btn-primary px-5">Submit</button>
       </div>
     </form>
   </div>
