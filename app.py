@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.5.6"
+__version__ = "0.5.7"
 
 import collections
 import glob
@@ -102,7 +102,10 @@ class Note:
             note.remove_lookup()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
-        # Actually change the title of the note.
+        # If there is an attached file.
+        if self.filename:
+            old_absfilepath = self.absfilepath
+        # Actually change the title of the note; rename the file/directory.
         self._title = title
         if os.path.isdir(old_abspath):
             abspath = self.abspath
@@ -110,6 +113,10 @@ class Note:
         else:
             abspath = f"{self.abspath}.md"
             os.rename(f"{old_abspath}.md", abspath)
+        # Rename attached file if there is one.
+        if self.filename:
+            self.filename = self.title + os.path.splitext(old_absfilepath)[1]
+            os.rename(old_absfilepath, self.absfilepath)
         # Update modified timestamp and add note to recently changed.
         self.modified = os.path.getmtime(abspath)
         put_recent(self)
