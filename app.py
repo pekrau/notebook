@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 
 import collections
 import glob
@@ -136,8 +136,11 @@ class Note:
         if self.filename:
             self.filename = self.title + os.path.splitext(old_absfilepath)[1]
             os.rename(old_absfilepath, self.absfilepath)
-        # Update modified timestamp and add note to recently changed.
-        self.modified = os.path.getmtime(abspath)
+        # Set modified timestamp of the file/directory.
+        now = time.time()
+        os.utime(abspath, (now, now))
+        self.modified = now
+        # Add note to recently changed.
         put_recent(self)
         # Add this note and below to path->note lookup with new path.
         for note in changing:
@@ -347,6 +350,8 @@ class Note:
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
         if self.supernote:
+            # It is not known which extension the attachment has,
+            # so look for anything except ".md".
             filepaths = [p for p in glob.glob(f"{self.abspath}.*")
                          if not p.endswith(".md")]
             if filepaths:
@@ -637,7 +642,7 @@ def put_recent(note):
     if note.supernote is None: return
     try:
         RECENT.remove(note)
-    except ValueError:
+    except KeyError:
         pass
     RECENT.appendleft(note)
     check_recent()
@@ -646,6 +651,8 @@ def check_recent():
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
+            for n in RECENT:
+                print(localtime(n.modified), n)
             raise ValueError(f"RECENT out of order: '{note}', '{latest}'")
 
 @app.context_processor
