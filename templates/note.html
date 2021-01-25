@@ -88,7 +88,7 @@
 {% block main %}
 {{ note['text'] | markdown }}
 {% if note.filename %}
-{% if note.file_extension in [".png", ".jpg"] %}
+{% if note.file_extension in [".png", ".PNG", ".jpg"] %}
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}">
 </div>
