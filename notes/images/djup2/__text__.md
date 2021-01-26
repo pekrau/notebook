@@ -6,4 +6,4 @@ This should be active [[test]].
 
 And here is a bare URL https://scilifelab.se
 
-Try embedded image ![Cat loaf](/file/subnote/cat-loaf)
+Try embedded image ![Cat loaf](/file/images/cat-loaf-among-loaves)

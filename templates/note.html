@@ -87,7 +87,7 @@
 
 {% block main %}
 {{ note['text'] | markdown }}
-{% if note.filename %}
+{% if note.file %}
 {% if note.file_extension.lower() in g.config['IMAGE_EXTENSIONS'] %}
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}"
@@ -96,7 +96,7 @@
 {% endif %}
 <a href="{{ url_for('file', path=note.path, download=True) }}"
    class="btn btn-primary my-lg-2">
-  Download file {{ note.filesize | filesizeformat }}
+  Download file {{ note.file_size | filesizeformat }}
 </a>
 {% endif %}
 {{ macros.noteslist(note.subnotes, 2) }}

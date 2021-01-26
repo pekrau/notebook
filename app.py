@@ -1,9 +1,8 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.6.3"
+__version__ = "0.6.4"
 
 import collections
-import glob
 import json
 import os
 import sys
@@ -36,7 +35,7 @@ def get_settings(dirpath):
                     DEBUG = True,
                     JSON_AS_ASCII = False,
                     NOTES_DIRPATH = "notes",
-                    IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg"],
+                    IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg", ".gif"],
                     MAX_RECENT = 12)
     try:
         filepath = os.path.join(dirpath, ".settings.json")
@@ -61,8 +60,8 @@ class Note:
         self._title = title
         self._text = ""
         self._ast = None
-        self.filename = None
-        self.filesize = None
+        self.file_extension = None
+        self.file_size = None
         self.modified = None
 
     def __repr__(self):
@@ -122,7 +121,7 @@ class Note:
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # If there is an attached file.
-        if self.filename:
+        if self.file_extension:
             old_absfilepath = self.absfilepath
         # Actually change the title of the note; rename the file/directory.
         self._title = title
@@ -133,8 +132,8 @@ class Note:
             abspath = f"{self.abspath}.md"
             os.rename(f"{old_abspath}.md", abspath)
         # Rename attached file if there is one.
-        if self.filename:
-            self.filename = self.title + os.path.splitext(old_absfilepath)[1]
+        if self.file_extension:
+            self.file_extension = os.path.splitext(old_absfilepath)[1]
             os.rename(old_absfilepath, self.absfilepath)
         # Set modified timestamp of the file/directory.
         now = time.time()
@@ -207,15 +206,9 @@ class Note:
 
     @property
     def absfilepath(self):
-        if not self.filename:
+        if not self.file_extension:
             raise ValueError("No file attached to this note.")
         return self.abspath + self.file_extension
-
-    @property
-    def file_extension(self):
-        if not self.filename:
-            raise ValueError("No file attached to this note.")
-        return os.path.splitext(self.filename)[1]
 
     @property
     def url(self):
@@ -223,6 +216,10 @@ class Note:
             return flask.url_for("note", path=self.path)
         else:
             return flask.url_for("home")
+
+    @property
+    def file(self):
+        return bool(self.file_extension)
 
     @property
     def count(self):
@@ -299,21 +296,20 @@ class Note:
         elif not extension:
             extension = ".bin"
         # Remove any existing attached file; may have different extension
-        if self.filename:
+        if self.file_extension:
             os.remove(self.absfilepath)
-        filename = self.title + extension
-        filepath = os.path.join(self.supernote.abspath, filename)
+        filepath = os.path.join(self.supernote.abspath, self.title + extension)
         with open(filepath, "wb") as outfile:
             outfile.write(content)
-        self.filename = filename
-        self.filesize = len(content)
+        self.file_extension = extension
+        self.file_size = len(content)
 
     def remove_file(self):
         "Remove the attached file, if any."
-        if not self.filename: return
+        if not self.file_extension: return
         os.remove(self.absfilepath)
-        self.filename = None
-        self.filesize = None
+        self.file_extension = None
+        self.file_size = None
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -330,15 +326,19 @@ class Note:
                 self._text = ""
                 self._ast = None      # Remove the AST cache.
                 self.modified = os.path.getmtime(abspath)
+            self._files = {}          # Needed only during read of subnotes.
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
                 if filename.startswith("_"): continue
                 if filename.endswith("~"): continue
                 basename, extension = os.path.splitext(filename)
-                # Skip attachment files.
-                if extension and extension != ".md": continue
-                note = Note(self, basename)
-                note.read()
+                # Record attached files for later.
+                if extension and extension != ".md":
+                    self._files[basename] = extension
+                else:
+                    note = Note(self, basename)
+                    note.read()
+            del self._files     # No longer needed.
         else:
             # It's a file; no subnotes.
             filepath = f"{abspath}.md"
@@ -350,13 +350,12 @@ class Note:
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
         if self.supernote:
-            # It is not known which extension the attachment has,
-            # so look for anything except ".md".
-            filepaths = [p for p in glob.glob(f"{self.abspath}.*")
-                         if not p.endswith(".md")]
-            if filepaths:
-                self.filename = os.path.basename(filepaths[0]) # Just one file!
-                self.filesize = os.stat(filepaths[0]).st_size
+            # Attached files recorded in supernote.
+            try:
+                self.file_extension = self.supernote._files[self.title]
+                self.file_size = os.stat(self.absfilepath).st_size
+            except KeyError:
+                pass
 
     def add_lookup(self):
         "Add the note to the path->note lookup."
@@ -468,7 +467,7 @@ class Note:
         self.remove_hashtags()
         self.star(remove=True)
         os.remove(f"{self.abspath}.md")
-        if self.filename:
+        if self.file_extension:
             os.remove(self.absfilepath)
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer. Not root!
@@ -714,7 +713,7 @@ def create():
                 return flask.redirect(flask.url_for("home"))
         upload = flask.request.files.get("upload")
         if upload:
-            title, ext = os.path.splitext(upload.filename)
+            title, extension = os.path.splitext(upload.filename)
         else:
             title = flask.request.form.get("title") or "No title"
         title = title.replace("\n", " ")  # Clean up title.
@@ -726,7 +725,7 @@ def create():
         try:
             note = supernote.create_subnote(title, text)
             if upload:
-                note.upload_file(upload.read(), ext)
+                note.upload_file(upload.read(), extension)
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
@@ -750,7 +749,7 @@ def file(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    if not note.filename:
+    if not note.file_extension:
         raise KeyError(f"No file attached to note '{path}'")
     if flask.request.values.get("download"):
         return flask.send_file(note.absfilepath,
