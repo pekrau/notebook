@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.6.4"
+__version__ = "0.6.5"
 
 import collections
 import json
@@ -20,6 +20,7 @@ STARRED = set()       # Notes
 RECENT = None         # Created in 'setup'
 BACKLINKS = dict()    # target note path -> set of source target paths
 HASHTAGS = dict()     # word -> set of note paths
+EMBEDDED = []         # Note embedding recursion stack.
 
 
 def get_settings(dirpath):
@@ -178,7 +179,7 @@ class Note:
     @property
     def ast(self):
         if self._ast is None:
-            self._ast = MARKDOWN_AST.convert(self.text)
+            self._ast = get_md_ast_parser().convert(self.text)
         return self._ast
 
     @property
@@ -524,6 +525,36 @@ class NoteLinkExt:
     elements = [NoteLink]
     renderer_mixins = [NoteLinkRendererMixin]
 
+class NoteEmbed(marko.inline.InlineElement):
+    pattern = r'!\[\[ *(.+?) *\]\]'
+    def __init__(self, match):
+        self.ref = match.group(1)
+
+class NoteEmbedRendererMixin:
+    def render_note_embed(self, element):
+        try:
+            note = LOOKUP[element.ref]
+        except KeyError:
+            # Stale link; target does not exist.
+            return f'<span class="text-danger">{element.ref}</span>'
+        else:
+            # Proper link to target. Check infinite recursion.
+            if element.ref in EMBEDDED:
+                return '<span class="text-danger"><i>Infinite recursion!</i>' \
+                       f' {element.ref}</span>'
+            else:
+                EMBEDDED.append(element.ref)
+                try:
+                    html = get_md_parser().convert(note.text)
+                    # XXX show embedding in some way
+                    return html
+                finally:
+                    EMBEDDED.pop()
+
+class NoteEmbedExt:
+    elements = [NoteEmbed]
+    renderer_mixins = [NoteEmbedRendererMixin]
+
 class HashTag(marko.inline.InlineElement):
     pattern = r'#([^#].+?)\b'
     parse_children = False
@@ -559,14 +590,19 @@ class HTMLRenderer(marko.html_renderer.HTMLRenderer):
     def render_quote(self, element):
         return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(self.render_children(element))
 
-MARKDOWN = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
+def get_md_parser():
+    return marko.Markdown(extensions=[NoteLinkExt, NoteEmbedExt,
+                                      HashTagExt, BareUrlExt],
                           renderer=HTMLRenderer)
-MARKDOWN_AST = marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
-                              renderer=marko.ast_renderer.ASTRenderer)
+
+def get_md_ast_parser():
+    return marko.Markdown(extensions=[NoteLinkExt, NoteEmbedExt,
+                                      HashTagExt, BareUrlExt],
+                          renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
     "Filter to process the value using augmented Marko markdown."
-    return jinja2.utils.Markup(MARKDOWN.convert(value or ""))
+    return jinja2.utils.Markup(get_md_parser().convert(value or ""))
 
 def localtime(value):
     "Filter to convert epoch value to local time ISO string."
