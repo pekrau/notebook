@@ -48,6 +48,8 @@
                 {% endfor %}
               </ul>
             </li>
+            {% block navmenu %}
+            {% endblock %}
           </ul>
           {% block navbar %}
           {% endblock %}
@@ -126,7 +128,7 @@
       <hr>
       <div class="row">
         <div class="col-md-9 text-muted">
-          Root directory: {{ config['NOTES_DIRPATH'] }}
+          Notebook directory: {{ config['NOTEBOOK_DIRPATH'] }}
         </div>
         <div class="col-md-3 text-end">
           <a href="https://github.com/pekrau/notes"

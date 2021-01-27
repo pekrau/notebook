@@ -1,11 +1,10 @@
 "Simple app for personal notebooks."
 
-__version__ = "0.6.6"
+__version__ = "0.7.0"
 
 import collections
 import json
 import os
-import sys
 import time
 
 import flask
@@ -22,31 +21,50 @@ BACKLINKS = dict()    # target note path -> set of source target paths
 HASHTAGS = dict()     # word -> set of note paths
 
 
-def get_settings(dirpath):
-    "Determine the notes directory and retun the settings."
-    if not os.path.exists(dirpath):
-        raise ValueError(f"No such directory: {dirpath}")
-    if not os.path.isdir(dirpath):
-        raise ValueError(f"Not a directory: {dirpath}")
+def get_settings():
+    "Return the settings."
     settings = dict(VERSION = __version__,
                     SERVER_NAME = "localhost.localdomain:5099",
                     SECRET_KEY = "this is a secret key",
                     TEMPLATES_AUTO_RELOAD = True,
                     DEBUG = True,
                     JSON_AS_ASCII = False,
-                    NOTES_DIRPATH = "notes",
                     IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg", ".gif"],
-                    MAX_RECENT = 12)
+                    MAX_RECENT = 12,
+                    NOTEBOOKS = [],
+                    DEFAULT_NOTEBOOK = "notes")
+    dirpath = os.path.dirname(__file__)
+    filepath = os.path.join(dirpath, ".settings.json")
     try:
-        filepath = os.path.join(dirpath, ".settings.json")
         with open(filepath) as infile:
             settings.update(json.load(infile))
-        settings["SETTINGS_FILEPATH"] = filepath
     except OSError:
-        settings["SETTINGS_FILEPATH"] = None
-    settings["NOTES_DIRPATH"] = dirpath
-    settings["HOME_TITLE"] = os.path.basename(dirpath)
+        pass
+    settings["SETTINGS_FILEPATH"] = filepath
+    # Add the default notebook if none recorded since before.
+    if not settings["NOTEBOOKS"]:
+        settings["NOTEBOOKS"].append(os.path.join(dirpath,
+                                                  settings["DEFAULT_NOTEBOOK"]))
+    # The first notebook is the starting one.
+    settings["NOTEBOOK_DIRPATH"] = settings["NOTEBOOKS"][0]
+    settings["NOTEBOOK_TITLE"] = os.path.basename(settings["NOTEBOOK_DIRPATH"])
     return settings
+
+def write_settings():
+    """Write out the settings file with updated information.
+    Update only the information that can be changed via the app.
+    """
+    dirpath = os.path.dirname(__file__)
+    filepath = os.path.join(dirpath, ".settings.json")
+    try:
+        with open(filepath) as infile:
+            settings = json.load(infile)
+    except OSError:
+        settings = {}
+    with open(filepath, "w") as outfile:
+        for key in ["NOTEBOOKS"]:
+            settings[key] = flask.current_app.config[key]
+        json.dump(settings, outfile, indent=2)
 
 
 class Note:
@@ -94,7 +112,7 @@ class Note:
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
         if self._title == title: return
-        new_abspath = os.path.join(flask.current_app.config["NOTES_DIRPATH"],
+        new_abspath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
@@ -200,9 +218,10 @@ class Note:
         "Return the absolute filepath of the note."
         path = self.path
         if path:
-            return os.path.join(flask.current_app.config["NOTES_DIRPATH"], path)
+            return os.path.join(
+                flask.current_app.config["NOTEBOOK_DIRPATH"], path)
         else:
-            return flask.current_app.config["NOTES_DIRPATH"]
+            return flask.current_app.config["NOTEBOOK_DIRPATH"]
 
     @property
     def absfilepath(self):
@@ -239,7 +258,7 @@ class Note:
             STARRED.add(self)
         else:
             return              # No change; no need to update file.
-        filepath = os.path.join(flask.current_app.config["NOTES_DIRPATH"],
+        filepath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"],
                                 "__starred__.json")
         with open(filepath, "w") as outfile:
             json.dump({"paths": [n.path for n in STARRED]}, outfile)
@@ -630,7 +649,6 @@ def setup():
     - Set up map of backlinks
     - Set up map of hashtags
     """
-    app.logger.debug(f"Settings file: {flask.current_app.config['SETTINGS_FILEPATH']}")
     timer = Timer()
     global ROOT
     global RECENT
@@ -654,7 +672,7 @@ def setup():
                                maxlen=flask.current_app.config["MAX_RECENT"])
     # Get the starred notes.
     try:
-        filepath = os.path.join(flask.current_app.config["NOTES_DIRPATH"], 
+        filepath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"], 
                                 "__starred__.json")
         with open(filepath) as infile:
             for path in json.load(infile)["paths"]:
@@ -683,19 +701,24 @@ def setup_template_context():
 
 @app.before_request
 def prepare():
-    "Add stuff to the 'g' object."
+    "Add the config dictionary to the 'g' object."
     flask.g.config = flask.current_app.config
 
 @app.route("/")
 def home():
-    "Home page; root note."
+    "Home page; root note of the current notebook."
     n_links = sum([len(s) for s in BACKLINKS.values()])
-    return flask.render_template("home.html", root=ROOT, n_links=n_links)
+    notebooks = [os.path.basename(n) 
+                 for n in flask.current_app.config["NOTEBOOKS"]]
+    return flask.render_template("home.html", 
+                                 root=ROOT,
+                                 n_links=n_links,
+                                 notebooks=notebooks)
 
 @app.route("/note")
 @app.route("/note/")
 def root():
-    "Root note is shown in the home page."
+    "Root note of the current notebook; redirect to home."
     return flask.redirect(flask.url_for("home"))
 
 @app.route("/create", methods=["GET", "POST"])
@@ -869,14 +892,66 @@ def search():
                                  notes=sorted(notes),
                                  terms=flask.request.values.get("terms"))
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        dirpath = os.path.normpath(os.path.expanduser(sys.argv[1]))
+@app.route("/notebook/<title>")
+def notebook(title=None):
+    "Change to another notebook."
+    for notebook in flask.current_app.config["NOTEBOOKS"]:
+        if not os.path.isdir(notebook): continue
+        if not (os.access(notebook, os.R_OK) and 
+                os.access(notebook, os.W_OK)):
+            flash_error("You may not read and write the directory.")
+            break
+        notebook_title = os.path.basename(notebook)
+        if notebook_title == title:
+            flask.current_app.config["NOTEBOOK_DIRPATH"] = notebook
+            flask.current_app.config["NOTEBOOK_TITLE"] = notebook_title
+            setup()
+            break
     else:
-        dirpath = os.path.join(os.getcwd(), "notes")
-    try:
-        settings = get_settings(dirpath)
-    except ValueError as error:
-        sys.exit(str(error))
+        flash_error(f"No such notebook '{title}'.")
+    return flask.redirect(flask.url_for("home"))
+
+@app.route("/notebook", methods=["GET", "POST"])
+def create_notebook():
+    if flask.request.method == "GET":
+        return flask.render_template("notebook.html")
+
+    elif flask.request.method == "POST":
+        try:
+            dirpath = flask.request.form["notebook"]
+        except KeyError:
+            flash_error("No directory path given.")
+            return flask.redirect(flask.url_for("home"))
+        dirpath = os.path.expanduser(dirpath)
+        dirpath = os.path.expandvars(dirpath)
+        dirpath = os.path.normpath(dirpath)
+        if not os.path.isabs(dirpath):
+            dirpath = os.path.join(os.path.expanduser("~"), dirpath)
+        title = os.path.basename(dirpath)
+        # If the notebook exists, just go to it.
+        if dirpath in flask.current_app.config["NOTEBOOKS"]:
+            return flask.redirect(flask.url_for("notebook", title=title))
+        # Directory exists; add it as a notebook and go to it.
+        if os.path.isdir(dirpath):
+            flask.current_app.config["NOTEBOOKS"].append(dirpath)
+            write_settings()
+            return flask.redirect(flask.url_for("notebook", title=title))
+        # Path exists, but is not a directory, 
+        if os.path.exists(dirpath):
+            flash_error("Path exists, but is not a directory.")
+            return flask.redirect(flask.url_for("home"))
+        # Create the directory.
+        try:
+            os.mkdir(dirpath)
+        except OSError as error:
+            flash_error(error)
+            return flask.redirect(flask.url_for("home"))
+        flask.current_app.config["NOTEBOOKS"].append(dirpath)
+        write_settings()
+        return flask.redirect(flask.url_for("notebook", title=title))
+
+
+if __name__ == "__main__":
+    settings = get_settings()
     app.config.from_mapping(settings)
     app.run(debug=settings["DEBUG"])

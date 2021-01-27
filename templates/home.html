@@ -1,11 +1,41 @@
 {% extends 'base.html' %}
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}notes {{ g.config['HOME_TITLE'] }}{% endblock %}
+{% block head_title %}notebook {{ g.config['NOTEBOOK_TITLE'] }}{% endblock %}
 {% block body_title %}
-{{ g.config['HOME_TITLE'] }}
-<small class="text-muted small">notes</small>
+<small class="text-muted small">notebook</small>
+{{ g.config['NOTEBOOK_TITLE'] }}
 {% endblock %}
+
+{% block navmenu %}
+<li class="nav-item dropdown">
+  <a href="#" id="notebooksDropdown"
+     role="button" data-bs-toggle="dropdown"
+     class="nav-link dropdown-toggle"
+     aria-expanded="false">Notebooks</a>
+  <ul class="dropdown-menu" aria-labelledby="notebooksDropdown">
+    {% for title in notebooks %}
+    <li>
+      {% if title == g.config['NOTEBOOK_TITLE'] %}
+      <a href="{{ url_for('notebook', title=title) }}"
+         tabindex="-1" aria-disabled="true"
+         class="dropdown-item disabled">{{ title }}</a>
+      {% else %}
+      <a href="{{ url_for('notebook', title=title) }}"
+         class="dropdown-item">{{ title }}</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+    <li>
+      <hr class="dropdown-divider">
+    </li>
+    <li>
+      <a href="{{ url_for('create_notebook') }}"
+         class="dropdown-item">Create notebook</a>
+    </li>
+  </ul>
+</li>
+{% endblock %} {# block navmenu #}
 
 {% block navbar %}
 {% if interactive %}

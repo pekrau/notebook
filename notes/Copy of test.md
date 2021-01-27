@@ -1,3 +1,7 @@
-This is a test note. Updated. [[subnote]]
+This is a test note. And this is a link to another note: [[subnotes]]
 
-Now with an attached file.
+## Title
+
+#unfinished
+
+Edited
