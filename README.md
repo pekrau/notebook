@@ -5,10 +5,10 @@ as interface.
 
 Features:
 
-- Markdown
-- Links and backlinks between notes.
+- Markdown for note text formatting.
+- Links and backlinks between notes in note text.
 - Any hierarchic structure allowed.
-- Hashtags in note text..
+- Hashtags in note text.
 - Data stored in ordinary files in a transparent manner.
 - Files of any kind may be stored.
 - The entire dataset is read in on startup. No need for a separate database.
