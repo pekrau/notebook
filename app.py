@@ -1,6 +1,6 @@
 "Simple app for personal notebooks."
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 import collections
 import json
@@ -188,7 +188,6 @@ class Note:
         self.add_backlinks()
         self.add_hashtags()
         self.write()
-        # print(json.dumps(self.ast, indent=2))
 
     text = property(get_text, set_text,
                     doc="The text of the note using Markdown format.")
@@ -456,8 +455,9 @@ class Note:
                 HASHTAGS[word].remove(path)
             except KeyError:
                 pass
-            if not HASHTAGS[word]:
-                HASHTAGS.pop(word)
+            else:
+                if not HASHTAGS[word]:
+                    HASHTAGS.pop(word)
 
     def parse_hashtags(self, children):
         """Find the hashtags in the children of the AST tree.
@@ -476,8 +476,9 @@ class Note:
 
     def create_subnote(self, title, text):
         "Create and return a subnote."
-        if title in self.subnotes:
-            raise ValueError(f"Note already exists: '{title}'")
+        for subnote in self.subnotes:
+            if title == subnote.title:
+                raise ValueError(f"Note already exists: '{title}'")
         abspath = self.abspath
         absfilepath = f"{abspath}.md"
         if os.path.isfile(absfilepath):
@@ -818,10 +819,10 @@ def edit(path=""):
         try:
             title = flask.request.form.get("title") or ""
             note.title = title
-        except ValueError:
+        except ValueError as error:
             flash_error(f"Invalid title: '{title}'")
             return flask.redirect(flask.url_for("edit", path=path))
-        except KeyError:
+        except KeyError as error:
             flash_error(f"Note already exists: '{title}'")
             return flask.redirect(flask.url_for("edit", path=path))
         note.text = flask.request.form.get("text") or ''
@@ -905,6 +906,9 @@ def notebook(title=None):
         if notebook_title == title:
             flask.current_app.config["NOTEBOOK_DIRPATH"] = notebook
             flask.current_app.config["NOTEBOOK_TITLE"] = notebook_title
+            flask.current_app.config["NOTEBOOKS"].remove(notebook)
+            flask.current_app.config["NOTEBOOKS"].insert(0, notebook)
+            write_settings()    # Keep this state for next session.
             setup()
             break
     else:

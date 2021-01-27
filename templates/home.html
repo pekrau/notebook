@@ -17,9 +17,8 @@
     {% for title in notebooks %}
     <li>
       {% if title == g.config['NOTEBOOK_TITLE'] %}
-      <a href="{{ url_for('notebook', title=title) }}"
-         tabindex="-1" aria-disabled="true"
-         class="dropdown-item disabled">{{ title }}</a>
+      <a href="#" tabindex="-1"
+         class="dropdown-item active">{{ title }}</a>
       {% else %}
       <a href="{{ url_for('notebook', title=title) }}"
          class="dropdown-item">{{ title }}</a>
