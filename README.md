@@ -1,4 +1,4 @@
-# notes
+# notebook
 
 Simple app for personal notes on your local machine using the browser
 as interface.
