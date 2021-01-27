@@ -1,6 +1,6 @@
 "Simple app for personal notes. Optionally publish using GitHub pages."
 
-__version__ = "0.6.5"
+__version__ = "0.6.6"
 
 import collections
 import json
@@ -20,7 +20,6 @@ STARRED = set()       # Notes
 RECENT = None         # Created in 'setup'
 BACKLINKS = dict()    # target note path -> set of source target paths
 HASHTAGS = dict()     # word -> set of note paths
-EMBEDDED = []         # Note embedding recursion stack.
 
 
 def get_settings(dirpath):
@@ -30,7 +29,7 @@ def get_settings(dirpath):
     if not os.path.isdir(dirpath):
         raise ValueError(f"Not a directory: {dirpath}")
     settings = dict(VERSION = __version__,
-                    SERVER_NAME = "localhost:5099",
+                    SERVER_NAME = "localhost.localdomain:5099",
                     SECRET_KEY = "this is a secret key",
                     TEMPLATES_AUTO_RELOAD = True,
                     DEBUG = True,
@@ -141,7 +140,7 @@ class Note:
         os.utime(abspath, (now, now))
         self.modified = now
         # Add note to recently changed.
-        put_recent(self)
+        self.put_recent()
         # Add this note and below to path->note lookup with new path.
         for note in changing:
             note.add_lookup()
@@ -245,6 +244,28 @@ class Note:
         with open(filepath, "w") as outfile:
             json.dump({"paths": [n.path for n in STARRED]}, outfile)
 
+    def put_recent(self):
+        "Put the note to the start of the list of recently modified notes."
+        # Root note should not be listed.
+        if self.supernote is None: return
+        self.remove_recent()
+        RECENT.appendleft(self)
+        app = flask.current_app
+        if app.config["DEBUG"]:
+            latest = RECENT[0]
+            for note in RECENT:
+                if note.modified > latest.modified:
+                    for n in RECENT:
+                        app.logger.debug(print(localtime(n.modified), n))
+                    raise ValueError("RECENT out of order")
+
+    def remove_recent(self):
+        "Remove this note from the list of recently modified notes."
+        try:
+            RECENT.remove(self)
+        except ValueError:
+            pass
+
     def count_traverse(self):
         "Return the number of subnotes recursively, including this one."
         result = 1
@@ -280,7 +301,7 @@ class Note:
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
             self.modified = os.path.getmtime(abspath)
-        put_recent(self)
+        self.put_recent()
 
     def upload_file(self, content, extension):
         """Upload the file given by content and filename extension.
@@ -438,15 +459,20 @@ class Note:
         "Create and return a subnote."
         if title in self.subnotes:
             raise ValueError(f"Note already exists: '{title}'")
-        if os.path.isfile(f"{self.abspath}.md"):
-            abspath = self.abspath
+        abspath = self.abspath
+        absfilepath = f"{abspath}.md"
+        if os.path.isfile(absfilepath):
             os.mkdir(abspath)
-            os.rename(f"{abspath}.md", os.path.join(abspath, "__text__.md"))
+            if os.stat(absfilepath).st_size:
+                os.rename(absfilepath, os.path.join(abspath, "__text__.md"))
+            else:
+                os.remove(absfilepath)
         note = Note(self, title)
         note.text = text        # This also adds backlinks.
         self.subnotes.sort()
         note.write()
         note.add_lookup()
+        note.put_recent()
         return note
 
     def is_deletable(self):
@@ -467,6 +493,7 @@ class Note:
         self.remove_backlinks()
         self.remove_hashtags()
         self.star(remove=True)
+        self.remove_recent()
         os.remove(f"{self.abspath}.md")
         if self.file_extension:
             os.remove(self.absfilepath)
@@ -525,36 +552,6 @@ class NoteLinkExt:
     elements = [NoteLink]
     renderer_mixins = [NoteLinkRendererMixin]
 
-class NoteEmbed(marko.inline.InlineElement):
-    pattern = r'!\[\[ *(.+?) *\]\]'
-    def __init__(self, match):
-        self.ref = match.group(1)
-
-class NoteEmbedRendererMixin:
-    def render_note_embed(self, element):
-        try:
-            note = LOOKUP[element.ref]
-        except KeyError:
-            # Stale link; target does not exist.
-            return f'<span class="text-danger">{element.ref}</span>'
-        else:
-            # Proper link to target. Check infinite recursion.
-            if element.ref in EMBEDDED:
-                return '<span class="text-danger"><i>Infinite recursion!</i>' \
-                       f' {element.ref}</span>'
-            else:
-                EMBEDDED.append(element.ref)
-                try:
-                    html = get_md_parser().convert(note.text)
-                    # XXX show embedding in some way
-                    return html
-                finally:
-                    EMBEDDED.pop()
-
-class NoteEmbedExt:
-    elements = [NoteEmbed]
-    renderer_mixins = [NoteEmbedRendererMixin]
-
 class HashTag(marko.inline.InlineElement):
     pattern = r'#([^#].+?)\b'
     parse_children = False
@@ -591,13 +588,11 @@ class HTMLRenderer(marko.html_renderer.HTMLRenderer):
         return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(self.render_children(element))
 
 def get_md_parser():
-    return marko.Markdown(extensions=[NoteLinkExt, NoteEmbedExt,
-                                      HashTagExt, BareUrlExt],
+    return marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
                           renderer=HTMLRenderer)
 
 def get_md_ast_parser():
-    return marko.Markdown(extensions=[NoteLinkExt, NoteEmbedExt,
-                                      HashTagExt, BareUrlExt],
+    return marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
                           renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
@@ -670,25 +665,6 @@ def setup():
         note.add_backlinks()
         note.add_hashtags()
     flash_message(f"Setup {timer}")
-
-def put_recent(note):
-    "Put the note to the start of the list of recently modified notes."
-    # Root note should not be listed.
-    if note.supernote is None: return
-    try:
-        RECENT.remove(note)
-    except KeyError:
-        pass
-    RECENT.appendleft(note)
-    check_recent()
-
-def check_recent():
-    latest = RECENT[0]
-    for note in RECENT:
-        if note.modified > latest.modified:
-            for n in RECENT:
-                print(localtime(n.modified), n)
-            raise ValueError(f"RECENT out of order: '{note}', '{latest}'")
 
 @app.context_processor
 def setup_template_context():
