@@ -1,4 +1,4 @@
-"Simple app for personal notes. Optionally publish using GitHub pages."
+"Simple app for personal notebooks."
 
 __version__ = "0.6.6"
 
@@ -634,6 +634,10 @@ def setup():
     timer = Timer()
     global ROOT
     global RECENT
+    LOOKUP.clear()
+    STARRED.clear()
+    BACKLINKS.clear()
+    HASHTAGS.clear()
     # Read in all notes, add to the path->note lookup.
     ROOT = Note(None, None)
     ROOT.read()
