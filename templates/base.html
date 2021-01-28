@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block head_title %}notes{% endblock %}</title>
+    <title>{% block head_title %}notebook{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='icon.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css"
           rel="stylesheet"
@@ -15,10 +15,11 @@
   <body>
     <nav class="navbar navbar-expand-md navbar-light bg-light">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('home') }}">
+        <a class="navbar-brand" href="{{ url_for('home') }}"
+           title="{{ config['NOTEBOOK_DIRPATH'] }}">
           <img src="{{ url_for('static', filename='icon.png') }}"
-	       width="32" height="32" class="d-inline-block align-top"
-	       title="notes">
+	       width="32" height="32" class="d-inline-block align-top">
+          {{ g.config['NOTEBOOK_TITLE'] }}
         </a>
         <button type="button" class="navbar-toggler"
                 data-bs-toggle="collapse" data-bs-target="#top_navbar"
@@ -59,12 +60,8 @@
 
     <div class="container-fluid">
       <div class="row">
-        <div class="col-md-2">
-          {% block action %}
-          {% endblock %}
-        </div>
-        <div class="col-md-8">
-          <h1>{% block body_title %}notes{% endblock %}</h1>
+        <div class="col-md-8 offset-md-2">
+          <h1>{% block body_title %}notebook{% endblock %}</h1>
         </div>
         <div class="col-md-2 py-1">
           {% block meta %}
@@ -121,12 +118,9 @@
 
       <hr>
       <div class="row">
-        <div class="col-md-9 text-muted">
-          Notebook directory: {{ config['NOTEBOOK_DIRPATH'] }}
-        </div>
-        <div class="col-md-3 text-end">
-          <a href="https://github.com/pekrau/notes"
-             class="text-decoration-none">notes {{ config['VERSION'] }}</a>
+        <div class="col-md-3 offset-md-9 text-end">
+          <a href="https://github.com/pekrau/notebook"
+             class="text-decoration-none">notebook {{ config['VERSION'] }}</a>
         </div>
       </div>
     </div>

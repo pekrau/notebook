@@ -1,11 +1,12 @@
 {# Starred notes #}
+{% set starred = get_starred() %}
 <div class="card mb-3">
   <div class="card-header bg-warning py-1">
-    <span class="bi-star-fill"></span>
+    <span class="bi-star-fill"></span> Starred
   </div>
   <div class="card-body small py-1">
     <table width="100%">
-      {% for note in get_starred() %}
+      {% for note in starred %}
       <tr>
         <td class="py-0">
           <a href="{{ note.url }}" class="text-decoration-none">
@@ -20,6 +21,13 @@
         </td>
       </tr>
       {% endfor %}
+      {% if not starred %}
+      {% endif %}
+      <tr>
+        <td colspan="2">
+          <i>none</i>
+        </td>
+      </tr>
     </table>
   </div>
 </div>

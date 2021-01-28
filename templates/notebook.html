@@ -3,13 +3,6 @@
 {% block head_title %}Create notebook{% endblock %}
 {% block body_title %}Create notebook{% endblock %}
 
-{% block action %}
-<div class="d-grid gap-2">
-  <a href="{{ url_for('home') }}"
-     class="btn btn-secondary mt-2 mx-2">Cancel</a>
-</div>
-{% endblock %} {# block action #}
-
 {% block main %}
 <form action="{{ url_for('create_notebook') }}"
       method="POST">
@@ -28,5 +21,7 @@
     <button type="submit" class="btn btn-primary px-5">Submit</button>
   </div>
 </form>
+<a href="{{ url_for('home') }}"
+   class="btn btn-secondary px-5">Cancel</a>
 {% endblock %} {# block main #}
 

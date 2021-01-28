@@ -7,12 +7,10 @@
 <small>{{ note.modified | localtime }}</small>
 {% endblock %}
 
-{% block action %}
-<div class="d-grid gap-2">
-  <a href="{{ url_for('note', path=note['path']) }}"
-     class="btn btn-secondary mt-2 mx-2">Cancel</a>
-</div>
-{% endblock %} {# block action #}
+{% block navbar %}
+<a href="{{ url_for('note', path=note['path']) }}"
+   class="btn btn-secondary px-5 mx-5">Cancel</a>
+{% endblock %} {# block navbar #}
 
 {% block left %}
 {% include 'backlinks.html' %}

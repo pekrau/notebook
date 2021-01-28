@@ -26,6 +26,8 @@
 
 {% block navbar %}
 {% if interactive %}
+<a href="{{ url_for('edit', path=note.path) }}"
+   class="btn btn-primary px-5 mx-5">Edit</a>
 <form action="{{ url_for('create') }}"
       class="mx-md-2 my-md-0"
       method="GET">
@@ -65,15 +67,6 @@
 </form>
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
-
-{% block action %}
-{% if interactive %}
-<div class="d-grid gap-2">
-  <a href="{{ url_for('edit', path=note.path) }}"
-     class="btn btn-primary mt-2 mx-2">Edit</a>
-</div>
-{% endif %} {# if interactive #}
-{% endblock %} {# block action #}
 
 {% block meta %}
 <small>{{ note.modified | localtime }}</small>

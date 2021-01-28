@@ -3,42 +3,15 @@
 
 {% block head_title %}notebook {{ g.config['NOTEBOOK_TITLE'] }}{% endblock %}
 {% block body_title %}
-<small class="text-muted small">notebook</small>
+<span class="text-muted">notebook</span>
 {{ g.config['NOTEBOOK_TITLE'] }}
 {% endblock %}
 
-{% block navmenu %}
-<li class="nav-item dropdown">
-  <a href="#" id="notebooksDropdown"
-     role="button" data-bs-toggle="dropdown"
-     class="nav-link dropdown-toggle"
-     aria-expanded="false">Notebooks</a>
-  <ul class="dropdown-menu" aria-labelledby="notebooksDropdown">
-    {% for title in notebooks %}
-    <li>
-      {% if title == g.config['NOTEBOOK_TITLE'] %}
-      <a href="#" tabindex="-1"
-         class="dropdown-item active">{{ title }}</a>
-      {% else %}
-      <a href="{{ url_for('notebook', title=title) }}"
-         class="dropdown-item">{{ title }}</a>
-      {% endif %}
-    </li>
-    {% endfor %}
-    <li>
-      <hr class="dropdown-divider">
-    </li>
-    <li>
-      <a href="{{ url_for('create_notebook') }}"
-         class="dropdown-item">Create notebook</a>
-    </li>
-  </ul>
-</li>
-{% endblock %} {# block navmenu #}
-
 {% block navbar %}
 {% if interactive %}
-<form action="{{ url_for('create') }}" class="me-md-2"
+<a href="{{ url_for('edit', path='') }}"
+   class="btn btn-outline-primary px-5 mx-md-2">Edit</a>
+<form action="{{ url_for('create') }}" class="mx-md-2"
       method="GET">
   <button type="submit" class="btn btn-outline-primary"
           title="Create a note.">Create</button>
@@ -53,18 +26,9 @@
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
 
-{% block action %}
-{% if interactive %}
-<div class="d-grid gap-2 mb-md-3">
-  <a href="{{ url_for('edit', path='') }}"
-     class="btn btn-primary mt-2">Edit</a>
-</div>
-{% endif %} {# if interactive #}
-{% endblock %} {# block action #}
-
 {% block left %}
 <div class="card mb-3">
-  <div class="card card-header">Totals</div>
+  <div class="card card-header">In this notebook</div>
   <ul class="list-group list-group-flush">
     <li class="list-group-item list-group-item-light">
       {{ root.count_traverse() }} notes
@@ -74,6 +38,21 @@
     </li>
   </ul>
 </div>
+<div class="card mb-3">
+  <div class="card card-header text-white bg-dark">Other notebooks</div>
+  <ul class="list-group list-group-flush">
+    {% for title in notebooks %}
+    {% if title != g.config['NOTEBOOK_TITLE'] %}
+    <li class="list-group-item">
+      <a href="{{ url_for('notebook', title=title) }}"
+         class="text-decoration-none">{{ title }}</a>
+    </li>
+    {% endif %}
+    {% endfor %}
+  </ul>
+</div>
+<a href="{{ url_for('create_notebook') }}"
+   class="btn btn-outline-dark d-grid">Create notebook</a>
 {% endblock %} {# block left #}
 
 {% block main %}
