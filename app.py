@@ -709,7 +709,7 @@ def prepare():
 def home():
     "Home page; root note of the current notebook."
     n_links = sum([len(s) for s in BACKLINKS.values()])
-    notebooks = [os.path.basename(n) 
+    notebooks = [(os.path.basename(n), n) 
                  for n in flask.current_app.config["NOTEBOOKS"]]
     return flask.render_template("home.html", 
                                  root=ROOT,

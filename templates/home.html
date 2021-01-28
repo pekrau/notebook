@@ -41,11 +41,11 @@
 <div class="card mb-3">
   <div class="card card-header text-white bg-dark">Other notebooks</div>
   <ul class="list-group list-group-flush">
-    {% for title in notebooks %}
+    {% for title, path in notebooks %}
     {% if title != g.config['NOTEBOOK_TITLE'] %}
     <li class="list-group-item">
       <a href="{{ url_for('notebook', title=title) }}"
-         class="text-decoration-none">{{ title }}</a>
+         title="{{ path }}" class="text-decoration-none">{{ title }}</a>
     </li>
     {% endif %}
     {% endfor %}
