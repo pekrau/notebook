@@ -1,6 +1,6 @@
 "Simple app for personal notebooks."
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"
 
 import collections
 import json
@@ -29,12 +29,12 @@ def get_settings():
                     TEMPLATES_AUTO_RELOAD = True,
                     DEBUG = True,
                     JSON_AS_ASCII = False,
-                    IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg", ".gif"],
+                    IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
                     MAX_RECENT = 12,
                     NOTEBOOKS = [],
-                    DEFAULT_NOTEBOOK = "notes")
+                    DEFAULT_NOTEBOOK = "example")
     dirpath = os.path.dirname(__file__)
-    filepath = os.path.join(dirpath, ".settings.json")
+    filepath = os.path.join(dirpath, "settings.json")
     try:
         with open(filepath) as infile:
             settings.update(json.load(infile))
@@ -55,7 +55,7 @@ def write_settings():
     Update only the information that can be changed via the app.
     """
     dirpath = os.path.dirname(__file__)
-    filepath = os.path.join(dirpath, ".settings.json")
+    filepath = os.path.join(dirpath, "settings.json")
     try:
         with open(filepath) as infile:
             settings = json.load(infile)
@@ -916,7 +916,8 @@ def notebook(title=None):
     return flask.redirect(flask.url_for("home"))
 
 @app.route("/notebook", methods=["GET", "POST"])
-def create_notebook():
+def add_notebook():
+    "Add a directory as a notebook."
     if flask.request.method == "GET":
         return flask.render_template("notebook.html")
 
@@ -940,19 +941,12 @@ def create_notebook():
             flask.current_app.config["NOTEBOOKS"].append(dirpath)
             write_settings()
             return flask.redirect(flask.url_for("notebook", title=title))
-        # Path exists, but is not a directory, 
+        # The path is a non-directory, or does not exist.
         if os.path.exists(dirpath):
-            flash_error("Path exists, but is not a directory.")
-            return flask.redirect(flask.url_for("home"))
-        # Create the directory.
-        try:
-            os.mkdir(dirpath)
-        except OSError as error:
-            flash_error(error)
-            return flask.redirect(flask.url_for("home"))
-        flask.current_app.config["NOTEBOOKS"].append(dirpath)
-        write_settings()
-        return flask.redirect(flask.url_for("notebook", title=title))
+            flash_error(f"The path '{dirpath}' does not specify a directory.")
+        else:
+            flash_error(f"The directory '{dirpath}' does not exist.")
+        return flask.redirect(flask.url_for("home"))
 
 
 if __name__ == "__main__":

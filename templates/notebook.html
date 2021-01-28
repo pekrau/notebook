@@ -1,27 +1,31 @@
 {% extends 'base.html' %}
 
-{% block head_title %}Create notebook{% endblock %}
-{% block body_title %}Create notebook{% endblock %}
+{% block head_title %}Add notebook{% endblock %}
+{% block body_title %}Add notebook{% endblock %}
 
 {% block main %}
-<form action="{{ url_for('create_notebook') }}"
-      method="POST">
-  <div class="mb-3">
-    <label for="notebook" class="col-form-label">Directory path</label>
-    <input type="text" name="notebook" id="notebook"
-           aria-describedby="notebookHelp"
-           class="form-control">
-    <div id="notebookHelp" class="form-text">
-      Path of the notebook directory to connect to or to create.
-      <br>
-      A relative path is relative to the home directory of the user.
-    </div>
+<div class="card">
+  <div class="card-body py-0">
+    <form action="{{ url_for('add_notebook') }}"
+          method="POST">
+      <div class="mb-3">
+        <label for="notebook" class="col-form-label">Directory path</label>
+        <input type="text" name="notebook" id="notebook"
+               aria-describedby="notebookHelp"
+               class="form-control">
+        <div id="notebookHelp" class="form-text">
+          Path of the notebook directory to add. It must exist.
+          <br>
+          A relative path is relative to the home directory of the user.
+        </div>
+      </div>
+      <div class="mb-3">
+        <button type="submit" class="btn btn-primary px-5">Add</button>
+      </div>
+    </form>
   </div>
-  <div class="mb-3">
-    <button type="submit" class="btn btn-primary px-5">Submit</button>
-  </div>
-</form>
+</div>
 <a href="{{ url_for('home') }}"
-   class="btn btn-secondary px-5">Cancel</a>
+   class="btn btn-secondary m-md-3 px-5">Cancel</a>
 {% endblock %} {# block main #}
 
