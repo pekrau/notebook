@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block head_title %}Move note '{{ note["title"] }}'{% endblock %}
+{% block body_title %}Move note '{{ note["title"] }}'{% endblock %}
+
+{% block meta %}
+<small>{{ note.modified | localtime }}</small>
+{% endblock %}
+
+{% block navbar %}
+<a href="{{ url_for('note', path=note['path']) }}"
+   class="btn btn-secondary px-5 mx-5">Cancel</a>
+{% endblock %} {# block navbar #}
+
+{% block left %}
+{% include 'backlinks.html' %}
+{% endblock %} {# block left #}
+
+
+{% block right %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
+{% endblock %} {# block right #}
+
+{% block main %}
+<div class="card">
+  <div class="card-body">
+    <form action="{{ url_for('move', path=note.path) }}"
+          method="POST">
+      <div class="mb-3">
+        <label for="current" class="col-form-label">Current supernote</label>
+        <input type="text" name="current" id="current" readonly
+               class="form-control"
+               value="{{ note.supernote.path }}">
+      </div>
+      <div class="mb-3">
+        <label for="supernote" class="col-form-label">New supernote</label>
+        <input type="text" name="supernote" id="supernote" autofocus
+               class="form-control"
+               aria-describedby="supernoteHelp">
+        <div id="supernoteHelp" class="form-text">
+          The path of the new supernote, which must exist.
+          May be in the form '[[path ]]'.
+        </div>
+      </div>
+      <div class="mb-3">
+        <button type="submit" class="btn btn-primary px-5">Move</button>
+      </div>
+    </form>
+  </div>
+</div>
+<a href="{{ url_for('note', path=note['path']) }}"
+   class="btn btn-secondary m-md-3 px-5">Cancel</a>
+{% endblock %} {# block main #}
+
+{% block javascript %}
+{% include 'clipboard.html' %}
+{% endblock %}

@@ -1,6 +1,6 @@
 "Simple app for personal notebooks."
 
-__version__ = "0.7.4"
+__version__ = "0.8.1"
 
 import collections
 import json
@@ -119,6 +119,9 @@ class Note:
         if os.path.exists(f"{new_abspath}.md"): raise KeyError
         # The set of notes whose paths will change: this one and all below it.
         changing = list(self.traverse())
+        print("changing >>>", changing)
+        # Remember the old path for each note whose paths will change.
+        old_paths = [note.path for note in changing]
         # The set of notes which link to any of these changed-path notes.
         affected = set()
         for note in changing:
@@ -127,31 +130,29 @@ class Note:
             except KeyError:
                 pass
         affected = [LOOKUP[p] for p in affected]
+        print("affected >>>", affected)
         # Remove all backlinks and hashtags while old paths.
         for note in affected:
             note.remove_backlinks()
             note.remove_hashtags()
-        # Remember the old path for each note whose paths will change.
-        old_paths = [n.path for n in changing]
         # Remove this note and below from the path->note lookup while old path.
         for note in changing:
             note.remove_lookup()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
-        # If there is an attached file.
+        # Save file path for any attached file.
         if self.file_extension:
             old_absfilepath = self.absfilepath
         # Actually change the title of the note; rename the file/directory.
         self._title = title
         if os.path.isdir(old_abspath):
             abspath = self.abspath
-            os.rename(old_abspath, abspath)  # New abspath
+            os.rename(old_abspath, abspath)
         else:
             abspath = f"{self.abspath}.md"
             os.rename(f"{old_abspath}.md", abspath)
         # Rename attached file if there is one.
         if self.file_extension:
-            self.file_extension = os.path.splitext(old_absfilepath)[1]
             os.rename(old_absfilepath, self.absfilepath)
         # Set modified timestamp of the file/directory.
         now = time.time()
@@ -163,14 +164,15 @@ class Note:
         for note in changing:
             note.add_lookup()
         # Get the new path for each note whose path was changed.
-        changed_paths = zip(old_paths, [n.path for n in changing])
+        changed_paths = zip(old_paths, [note.path for note in changing])
         for note in affected:
             text = note.text
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
-            note.text = text
-            note.write()
-        # Add back backlinks and hashtags with new paths in place.
+            note._text = text   # Do not add backlinks just yet.
+            note._ast = None    # Force recompile.
+            note.write(update_modified=False)
+        # Add back backlinks and hashtags with new paths.
         for note in affected:
             note.add_backlinks()
             note.add_hashtags()
@@ -181,6 +183,7 @@ class Note:
         return self._text
 
     def set_text(self, text):
+        if text == self._text: return
         self.remove_backlinks()
         self.remove_hashtags()
         self._text = text
@@ -274,8 +277,8 @@ class Note:
             for note in RECENT:
                 if note.modified > latest.modified:
                     for n in RECENT:
-                        app.logger.debug(print(localtime(n.modified), n))
-                    raise ValueError("RECENT out of order")
+                        print(n.modified, n)
+                    raise ValueError(f"RECENT out of order: {self}")
 
     def remove_recent(self):
         "Remove this note from the list of recently modified notes."
@@ -304,22 +307,30 @@ class Note:
         for subnote in self.subnotes:
             yield from subnote.traverse()
 
-    def write(self):
+    def write(self, update_modified=True):
         "Write this note to disk. Does *not* write subnotes."
-        if os.path.isdir(self.abspath):
+        abspath = self.abspath
+        if os.path.isdir(abspath):
             if self.text:       # Only write dir text if anything to write.
-                abspath = os.path.join(self.abspath, "__text__.md")
+                abspath = os.path.join(abspath, "__text__.md")
+                stat = os.stat(abspath)
                 with open(abspath, "w") as outfile:
                     outfile.write(self.text)
-                self.modified = os.path.getmtime(abspath)
             else:
-                self.modified = os.path.getmtime(self.abspath)
+                stat = os.stat(abspath)
+                try:            # Remove the dir text file, if any.
+                    os.remove(os.path.join(abspath, "__text__.md"))
+                except OSError:
+                    pass
         else:
-            abspath = f"{self.abspath}.md"
+            abspath = abspath + ".md"
+            stat = os.stat(abspath)
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
+        if update_modified:
             self.modified = os.path.getmtime(abspath)
-        self.put_recent()
+        else:
+            os.utime(abspath, (stat.st_atime, stat.st_ctime))
 
     def upload_file(self, content, extension):
         """Upload the file given by content and filename extension.
@@ -494,6 +505,18 @@ class Note:
         note.add_lookup()
         note.put_recent()
         return note
+
+    def move(self, supernote):
+        "Move this note to a new supernote."
+        if self is supernote:
+            raise ValueError("Cannot move note to be its own supernote.")
+        # The set of
+        subnotes = list(self.traverse())
+        if changing in children:
+            raise ValueError("Cannot move note to one of its subnotes.")
+        affected = set()
+        for note in changing:
+            pass  # XXX
 
     def is_deletable(self):
         """May this note be deleted?
@@ -835,16 +858,36 @@ def edit(path=""):
                                  os.path.splitext(upload.filename)[1])      
         return flask.redirect(note.url)
 
-@app.route("/star/<path:path>", methods=["POST"])
-def star(path):
-    "Toggle the star state of the note for the path."
+@app.route("/move/<path:path>", methods=["GET", "POST"])
+def move(path):
+    "Move the given note to a new supernote."
     try:
         note = LOOKUP[path]
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    note.star()
-    return flask.redirect(note.url)
+
+    if flask.request.method == "GET":
+        if note is ROOT:
+            flash_error("Cannot move root note.")
+            return flask.redirect(note.url)
+        return flask.render_template("move.html", note=note)
+
+    elif flask.request.method == "POST":
+        supernote = flask.request.form.get("supernote") or ""
+        if supernote.startswith("[["):
+            supernote = supernote[2:]
+        if supernote.endswith("]]"):
+            supernote = supernote[:-2]
+        try:
+            supernote = LOOKUP[supernote]
+        except KeyError:
+            flash_error(f"No such supernote: '{supernote}'")
+        try:
+            note.move(supernote)
+        except ValueError as error:
+            flash_error(error)
+        return flask.redirect(note.url)
 
 @app.route("/delete/<path:path>", methods=["POST"])
 def delete(path):
@@ -860,6 +903,17 @@ def delete(path):
         flash_error(error)
         return flask.redirect(note.url)
     return flask.redirect(note.supernote.url)
+
+@app.route("/star/<path:path>", methods=["POST"])
+def star(path):
+    "Toggle the star state of the note for the path."
+    try:
+        note = LOOKUP[path]
+    except KeyError:
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    note.star()
+    return flask.redirect(note.url)
 
 @app.route("/hashtag/<word>")
 def hashtag(word):

@@ -47,7 +47,11 @@ Create a new note
       {% if upload %}
       <div class="mb-3">
         <label for="upload" class="form-label">Upload file</label>
-        <input class="form-control" type="file" name="upload" id="upload">
+        <input class="form-control" type="file" name="upload" id="upload"
+               aria-describedby="uploadHelp">
+        <div id="titleHelp" class="form-text">
+          The filename will be used as the title of the note.
+        </div>
       </div>
       {% else %}
       <div class="mb-3">
@@ -72,7 +76,7 @@ Create a new note
         </div>
       </div>
       <div class="mb-3">
-        <button type="submit" class="btn btn-primary px-5">Submit</button>
+        <button type="submit" class="btn btn-primary px-5">Create</button>
       </div>
     </form>
   </div>
@@ -92,8 +96,5 @@ Create a new note
 {% endblock %} {# block right #}
 
 {% block javascript %}
-<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
-<script>
-  var clipboard = new ClipboardJS('.btn-clipboard');
-</script>
+{% include 'clipboard.html' %}
 {% endblock %}

@@ -27,17 +27,7 @@
 {% block navbar %}
 {% if interactive %}
 <a href="{{ url_for('edit', path=note.path) }}"
-   class="btn btn-primary px-5 mx-5">Edit</a>
-<form action="{{ url_for('create') }}"
-      class="mx-md-2 my-md-0"
-      method="GET">
-  {% if note.supernote %}
-  <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
-  {% endif %}
-  <input type="hidden" name="source" value="{{ note.path }}">
-  <button type="submit" class="btn btn-outline-primary"
-          title="Create a copy of this note.">Copy</button>
-</form>
+   class="btn btn-primary px-5 mx-md-5">Edit</a>
 <form action="{{ url_for('create') }}"
       class="mx-md-2 my-md-0"
       method="GET">
@@ -56,6 +46,18 @@
   <input type="hidden" name="upload" value="true">
   <button type="submit" class="btn btn-outline-primary"
           title="Upload a file as a subnote for this note.">Upload</button>
+</form>
+<a href="{{ url_for('move', path=note.path) }}"
+   class="btn btn-outline-primary mx-md-2">Move</a>
+<form action="{{ url_for('create') }}"
+      class="mx-md-2 my-md-0"
+      method="GET">
+  {% if note.supernote %}
+  <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
+  {% endif %}
+  <input type="hidden" name="source" value="{{ note.path }}">
+  <button type="submit" class="btn btn-outline-primary"
+          title="Create a copy of this note.">Copy</button>
 </form>
 <form action="{{ url_for('delete', path=note.path) }}"
       class="mx-md-2 my-md-0"
@@ -103,8 +105,5 @@
 {% endblock %}
 
 {% block javascript %}
-<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
-<script>
-  var clipboard = new ClipboardJS('.btn-clipboard');
-</script>
+{% include 'clipboard.html' %}
 {% endblock %}

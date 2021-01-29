@@ -84,8 +84,5 @@
 {% endblock %} {# block right #}
 
 {% block javascript %}
-<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
-<script>
- var clipboard = new ClipboardJS('.btn-clipboard');
-</script>
+{% include 'clipboard.html' %}
 {% endblock %}

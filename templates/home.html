@@ -26,6 +26,10 @@
 {% endif %} {# if interactive #}
 {% endblock %} {# block navbar #}
 
+{% block meta %}
+<small>{{ root.modified | localtime }}</small>
+{% endblock %}
+
 {% block left %}
 <div class="card mb-3">
   <div class="card card-header">In this notebook</div>
@@ -68,8 +72,5 @@
 {% endblock %} {# block right #}
 
 {% block javascript %}
-<script src="{{ url_for('static', filename='clipboard.min.js') }}"></script>
-<script>
- var clipboard = new ClipboardJS('.btn-clipboard');
-</script>
+{% include 'clipboard.html' %}
 {% endblock %}
