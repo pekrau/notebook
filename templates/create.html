@@ -16,17 +16,15 @@ Create a new note
 {% endif %}
 {% endblock %}
 
-{% block left %}
-<div class="d-grid gap-2">
-  {% if source %}
-  <a href="{{ source.url }}" class="btn btn-secondary">Cancel</a>
-  {% elif supernote %}
-  <a href="{{ supernote.url }}" class="btn btn-secondary">Cancel</a>
-  {% else %}
-  <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
-  {% endif %}
-</div>
-{% endblock %} {# block left #}
+{% block navbar %}
+{% if source %}
+<a href="{{ source.url }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
+{% elif supernote %}
+<a href="{{ supernote.url }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
+{% else %}
+<a href="{{ url_for('home') }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
+{% endif %}
+{% endblock %} {# block navbar #}
 
 {% block main %}
 <div class="card">
@@ -79,6 +77,13 @@ Create a new note
     </form>
   </div>
 </div>
+{% if source %}
+<a href="{{ source.url }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
+{% elif supernote %}
+<a href="{{ supernote.url }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
+{% else %}
+<a href="{{ url_for('home') }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
+{% endif %}
 {% endblock %} {# block main #}
 
 {% block right %}

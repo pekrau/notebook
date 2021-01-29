@@ -1,27 +1,33 @@
 # notebook
 
-Simple app for personal notes on your local machine using the browser
-as interface.
+Simple app for personal notes on your local machine using your browser
+as interface. Partially inspired by Obsidian.
 
-Features:
+## Features
 
+- Each note is a single Markdown file.
+- No separate database; the directory structure is the hierarchy and storage.
 - Markdown for note text formatting.
-- Links and backlinks between notes in note text.
-- Any hierarchic structure allowed.
+- Links in the note text; backlinks between notes updated dynamically.
 - Hashtags in note text.
-- Data stored in ordinary files in a transparent manner.
+- Hierarchic structure allowed; subnotes.
 - Files of any kind may be stored.
-- The entire dataset is read in on startup. No need for a separate database.
-- Being a Flask app, uses your browser for navigation and editing.
+- The entire dataset is read and parsed on startup.
+- The app is a Flask server, so use your browser for navigation and editing.
 - Keep separate notebooks (sets of notes) which can easily be switched between.
 
-Future features:
+## Future features
 
+- Inclusion of other note's text in a note.
 - Publish using GitHub pages.
 - Create MS Word file.
 - Create PDF file.
 
-Written in Python 3.6. Uses:
+## Implementation
+
+Written in Python 3.6.
+
+Uses:
 
 - [Flask](https://flask.palletsprojects.com/en/1.1.x/)
 - [Marko](https://github.com/frostming/marko)
