@@ -1,6 +1,6 @@
-"Simple app for personal notebooks."
+"Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 
 import collections
 import json

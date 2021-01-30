@@ -1,7 +1,7 @@
 # notebooks
 
-Simple app for personal notes on your local machine using your browser
-as interface. Partially inspired by Obsidian.
+Simple app for personal notes in your file system using your browser
+as interface. Inspired by Obsidian.
 
 ## Features
 
@@ -10,9 +10,11 @@ as interface. Partially inspired by Obsidian.
 - Markdown for note text formatting.
 - Links in the note text; backlinks between notes updated dynamically.
 - Hashtags in note text.
+- Search all titles and text.
 - Hierarchic structure allowed; subnotes.
 - Files of any kind may be stored.
-- The app is a Flask server, so use your browser for navigation and editing.
+- The app is a Flask server, so your browser is the interface for 
+  navigation and editing.
 - Keep separate notebooks (sets of notes) which can easily be switched between.
 
 ## Future features
