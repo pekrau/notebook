@@ -13,12 +13,12 @@ import marko.ast_renderer
 import jinja2.utils
 
 
-ROOT = None           # Created in 'setup'
-LOOKUP = dict()       # path->note lookup
+ROOT = None           # The root note. Created in 'setup'
+LOOKUP = dict()       # Lookup path->note
 STARRED = set()       # Notes
-RECENT = None         # Created in 'setup'
-BACKLINKS = dict()    # target note path -> set of source target paths
-HASHTAGS = dict()     # word -> set of note paths
+RECENT = None         # Deque of recently modified note. Created in 'setup'
+BACKLINKS = dict()    # Lookup target note path -> set of source target paths
+HASHTAGS = dict()     # Lookup word -> set of note paths
 
 
 def get_settings():

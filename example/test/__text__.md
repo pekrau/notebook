@@ -1,1 +1,1 @@
-This is a test note, links to [[images/tiefe2]].
+This is a test note, links to [[images/your project]].
