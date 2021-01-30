@@ -1,6 +1,6 @@
 "Simple app for personal notebooks."
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 import collections
 import json
@@ -91,8 +91,8 @@ class Note:
     def __contains__(self, term):
         "Does this note contain the search term?"
         term = term.lower()
-        if term in self._title.lower(): return True
-        if term in self._text.lower(): return True
+        if term in self.title.lower(): return True
+        if term in self.text.lower(): return True
         return False
 
     def get_title(self):
@@ -111,28 +111,26 @@ class Note:
         if title[0] == ".": raise ValueError
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
-        if self._title == title: return
+        if self.title == title: return
         new_abspath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
-        if os.path.exists(f"{new_abspath}.md"): raise KeyError
+        if os.path.exists(new_abspath + ".md"): raise KeyError
         # The set of notes whose paths will change: this one and all below it.
         changing = list(self.traverse())
-        print("changing >>>", changing)
         # Remember the old path for each note whose paths will change.
         old_paths = [note.path for note in changing]
-        # The set of notes which link to any of these changed-path notes.
-        affected = set()
+        # The set of notes which link to any of the changing-path notes.
+        linking = set()
         for note in changing:
             try:
-                affected.update(BACKLINKS[note.path])
+                linking.update(BACKLINKS[note.path])
             except KeyError:
                 pass
-        affected = [LOOKUP[p] for p in affected]
-        print("affected >>>", affected)
+        linking = [LOOKUP[p] for p in linking]
         # Remove all backlinks and hashtags while old paths.
-        for note in affected:
+        for note in linking:
             note.remove_backlinks()
             note.remove_hashtags()
         # Remove this note and below from the path->note lookup while old path.
@@ -149,31 +147,31 @@ class Note:
             abspath = self.abspath
             os.rename(old_abspath, abspath)
         else:
-            abspath = f"{self.abspath}.md"
-            os.rename(f"{old_abspath}.md", abspath)
-        # Rename attached file if there is one.
+            abspath = self.abspath + ".md"
+            os.rename(old_abspath + ".md", abspath)
+        # Rename the attached file if there is one.
         if self.file_extension:
             os.rename(old_absfilepath, self.absfilepath)
         # Set modified timestamp of the file/directory.
         now = time.time()
         os.utime(abspath, (now, now))
         self.modified = now
-        # Add note to recently changed.
+        # Add this note to recently changed.
         self.put_recent()
         # Add this note and below to path->note lookup with new path.
         for note in changing:
             note.add_lookup()
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
-        for note in affected:
+        for note in linking:
             text = note.text
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
             note._text = text   # Do not add backlinks just yet.
             note._ast = None    # Force recompile.
             note.write(update_modified=False)
-        # Add back backlinks and hashtags with new paths.
-        for note in affected:
+        # Add back backlinks and hashtags with new the paths.
+        for note in linking:
             note.add_backlinks()
             note.add_hashtags()
 
@@ -392,7 +390,7 @@ class Note:
             del self._files     # No longer needed.
         else:
             # It's a file; no subnotes.
-            filepath = f"{abspath}.md"
+            filepath = abspath + ".md"
             with open(filepath) as infile:
                 self._text = infile.read()
                 self._ast = None      # Remove the AST cache.
@@ -490,11 +488,12 @@ class Note:
         for subnote in self.subnotes:
             if title == subnote.title:
                 raise ValueError(f"Note already exists: '{title}'")
+        # If this note is a file, then convert it into a directory.
         abspath = self.abspath
-        absfilepath = f"{abspath}.md"
+        absfilepath = abspath + ".md"
         if os.path.isfile(absfilepath):
             os.mkdir(abspath)
-            if os.stat(absfilepath).st_size:
+            if os.path.getsize(absfilepath):
                 os.rename(absfilepath, os.path.join(abspath, "__text__.md"))
             else:
                 os.remove(absfilepath)
@@ -510,13 +509,81 @@ class Note:
         "Move this note to a new supernote."
         if self is supernote:
             raise ValueError("Cannot move note to be its own supernote.")
-        # The set of
-        subnotes = list(self.traverse())
-        if changing in children:
+        # The set of notes whose paths will change: this one and all below it.
+        changing = list(self.traverse())
+        if self in changing[1:]:
             raise ValueError("Cannot move note to one of its subnotes.")
-        affected = set()
+        for note in supernote.subnotes:
+            if self.title == note.title:
+                raise ValueError("New supernote already has a subnote"
+                                 " with the title of this note.")
+        # Remember the old path for each note whose paths will change.
+        old_paths = [note.path for note in changing]
+        # The set of notes which link to any of the changing-path notes.
+        linking = set()
         for note in changing:
-            pass  # XXX
+            try:
+                linking.update(BACKLINKS[note.path])
+            except KeyError:
+                pass
+        linking = [LOOKUP[p] for p in linking]
+        # Remove all backlinks and hashtags while old paths.
+        for note in linking:
+            note.remove_backlinks()
+            note.remove_hashtags()
+        # Remove this note and below from the path->note lookup while old path.
+        for note in changing:
+            note.remove_lookup()
+        # Old abspath needed for renaming directory/file.
+        old_abspath = self.abspath
+        # Save file path for any attached file.
+        if self.file_extension:
+            old_absfilepath = self.absfilepath
+        # If the new supernote is a file, then convert it to a directory.
+        abspath = supernote.abspath
+        absfilepath = abspath + ".md"
+        if os.path.isfile(absfilepath):
+            os.mkdir(abspath)
+            if os.path.getsize(absfilepath):
+                os.rename(absfilepath, os.path.join(abspath, "__text__.md"))
+            else:
+                os.remove(absfilepath)
+        # Actually set the new supernote; move the note/directory.
+        self.supernote.subnotes.remove(self)
+        self.supernote = supernote
+        self.supernote.subnotes.append(self)
+        self.supernote.subnotes.sort()
+        if os.path.isdir(old_abspath):
+            abspath = self.abspath
+            os.rename(old_abspath, abspath)
+        else:
+            abspath = self.abspath + ".md"
+            os.rename(old_abspath + ".md", abspath)
+        # Move the attached file if there is one.
+        if self.file_extension:
+            os.rename(old_absfilepath, self.absfilepath)
+        # Set modified timestamp of the file/directory.
+        now = time.time()
+        os.utime(abspath, (now, now))
+        self.modified = now
+        # Add this note to recently changed.
+        self.put_recent()
+        # Add this note and below to path->note lookup with new path.
+        for note in changing:
+            note.add_lookup()
+        # Get the new path for each note whose path was changed.
+        changed_paths = zip(old_paths, [note.path for note in changing])
+        for note in linking:
+            text = note.text
+            for old_path, new_path in changed_paths:
+                text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
+            note._text = text   # Do not add backlinks just yet.
+            note._ast = None    # Force recompile.
+            note.write(update_modified=False)
+        # Add back backlinks and hashtags with new the paths.
+        for note in linking:
+            note.add_backlinks()
+            note.add_hashtags()
 
     def is_deletable(self):
         """May this note be deleted?
@@ -537,7 +604,7 @@ class Note:
         self.remove_hashtags()
         self.star(remove=True)
         self.remove_recent()
-        os.remove(f"{self.abspath}.md")
+        os.remove(self.abspath + ".md")
         if self.file_extension:
             os.remove(self.absfilepath)
         self.supernote.subnotes.remove(self)
@@ -546,9 +613,9 @@ class Note:
             abspath = self.supernote.abspath
             filepath = os.path.join(abspath, "__text__.md")
             try:
-                os.rename(filepath, f"{abspath}.md")
+                os.rename(filepath, abspath + ".md")
             except OSError:     # May happen if e.g. no text for dir.
-                with open(f"{abspath}.md", "w") as outfile:
+                with open(abspath + ".md", "w") as outfile:
                     outfile.write(sels.supernote.text)
             os.rmdir(abspath)
 
@@ -971,7 +1038,7 @@ def notebook(title=None):
 
 @app.route("/notebook", methods=["GET", "POST"])
 def add_notebook():
-    "Add a directory as a notebook."
+    "Add a directory as a notebook. It must exist."
     if flask.request.method == "GET":
         return flask.render_template("notebook.html")
 

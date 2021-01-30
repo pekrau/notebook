@@ -43,10 +43,15 @@
   </ul>
 </div>
 <div class="card mb-3">
-  <div class="card card-header text-white bg-dark">Other notebooks</div>
+  <div class="card card-header text-white bg-dark">Notebooks</div>
   <ul class="list-group list-group-flush">
     {% for title, path in notebooks %}
-    {% if title != g.config['NOTEBOOK_TITLE'] %}
+    {% if title == g.config['NOTEBOOK_TITLE'] %}
+    <li class="list-group-item">
+      <a href="{{ url_for('notebook', title=title) }}"
+         title="{{ path }}" class="text-decoration-none fw-bold">{{ title }}</a>
+    </li>
+    {% else %}
     <li class="list-group-item">
       <a href="{{ url_for('notebook', title=title) }}"
          title="{{ path }}" class="text-decoration-none">{{ title }}</a>
@@ -56,7 +61,8 @@
   </ul>
 </div>
 <a href="{{ url_for('add_notebook') }}"
-   class="btn btn-outline-dark d-grid">Add notebook</a>
+   class="btn btn-outline-dark d-grid"
+   title="Add an existing directory as notebook.">Add notebook</a>
 {% endblock %} {# block left #}
 
 {% block main %}

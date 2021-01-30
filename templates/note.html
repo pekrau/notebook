@@ -87,6 +87,11 @@
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}"
        class="border border-secondary">
+  <button class="btn btn-clipboard btn-outline-none"
+          data-clipboard-text="{{ url_for('file', path=note.path, _external=True) }}"
+        title="Copy the URL of the image to the clipboard.">
+  <span class="bi-clipboard text-dark"></span>
+</button>
 </div>
 {% endif %}
 <a href="{{ url_for('file', path=note.path, download=True) }}"

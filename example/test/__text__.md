@@ -1,1 +1,1 @@
-This is a test note, links to [[subnote/tiefe2]].
+This is a test note, links to [[images/tiefe2]].

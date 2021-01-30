@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block head_title %}notebook{% endblock %}</title>
+    <title>{% block head_title %}notebooks{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='icon.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css"
           rel="stylesheet"
@@ -61,7 +61,7 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-md-8 offset-md-2">
-          <h1>{% block body_title %}notebook{% endblock %}</h1>
+          <h1>{% block body_title %}notebooks{% endblock %}</h1>
         </div>
         <div class="col-md-2 py-1">
           {% block meta %}
@@ -119,8 +119,8 @@
       <hr>
       <div class="row">
         <div class="col-md-3 offset-md-9 text-end">
-          <a href="https://github.com/pekrau/notebook"
-             class="text-decoration-none">notebook {{ config['VERSION'] }}</a>
+          <a href="https://github.com/pekrau/notebooks"
+             class="text-decoration-none">notebooks {{ config['VERSION'] }}</a>
         </div>
       </div>
     </div>
