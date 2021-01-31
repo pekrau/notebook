@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.8.4"
+__version__ = "0.8.5"
 
 import collections
 import json
@@ -104,6 +104,7 @@ class Note:
         Raise KeyError if there is already a note with that title
         """
         if not self.supernote: return  # Root note has no title to change.
+        title = title.replace("\r", "")
         title = title.strip()
         if not title: raise ValueError
         if "/" in title: raise ValueError
@@ -136,7 +137,7 @@ class Note:
         old_abspath = self.abspath
         # Save file path for any attached file.
         if self.file_extension:
-            old_absfilepath = self.absfilepath
+            old_abspathfile = self.abspathfile
         # Actually change the title of the note; rename the file/directory.
         self._title = title
         if os.path.isdir(old_abspath):
@@ -147,7 +148,7 @@ class Note:
             os.rename(old_abspath + ".md", abspath)
         # Rename the attached file if there is one.
         if self.file_extension:
-            os.rename(old_absfilepath, self.absfilepath)
+            os.rename(old_abspathfile, self.abspathfile)
         # Set modified timestamp of the file/directory.
         now = time.time()
         os.utime(abspath, (now, now))
@@ -174,6 +175,7 @@ class Note:
         return self._text
 
     def set_text(self, text):
+        text = text.replace("\r", "")
         if text == self._text: return
         self.remove_backlinks()
         self.remove_hashtags()
@@ -217,7 +219,7 @@ class Note:
             return flask.current_app.config["NOTEBOOK_DIRPATH"]
 
     @property
-    def absfilepath(self):
+    def abspathfile(self):
         if not self.file_extension:
             raise ValueError("No file attached to this note.")
         return self.abspath + self.file_extension
@@ -262,14 +264,7 @@ class Note:
         if self.supernote is None: return
         self.remove_recent()
         RECENT.appendleft(self)
-        app = flask.current_app
-        if app.config["DEBUG"]:
-            latest = RECENT[0]
-            for note in RECENT:
-                if note.modified > latest.modified:
-                    for n in RECENT:
-                        print(n.modified, n)
-                    raise ValueError(f"RECENT out of order: {self}")
+        check_recent_ordered()
 
     def remove_recent(self):
         "Remove this note from the list of recently modified notes."
@@ -315,10 +310,13 @@ class Note:
                     pass
         else:
             abspath = abspath + ".md"
-            stat = os.stat(abspath)
+            try:
+                stat = os.stat(abspath)
+            except OSError:     # The note is new; the file does not exist.
+                stat = None
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
-        if update_modified:
+        if update_modified or stat is None:
             self.modified = os.path.getmtime(abspath)
         else:
             os.utime(abspath, (stat.st_atime, stat.st_ctime))
@@ -339,7 +337,7 @@ class Note:
             extension = ".bin"
         # Remove any existing attached file; may have different extension
         if self.file_extension:
-            os.remove(self.absfilepath)
+            os.remove(self.abspathfile)
         filepath = os.path.join(self.supernote.abspath, self.title + extension)
         with open(filepath, "wb") as outfile:
             outfile.write(content)
@@ -349,7 +347,7 @@ class Note:
     def remove_file(self):
         "Remove the attached file, if any."
         if not self.file_extension: return
-        os.remove(self.absfilepath)
+        os.remove(self.abspathfile)
         self.file_extension = None
         self.file_size = None
 
@@ -363,11 +361,10 @@ class Note:
                 with open(filepath) as infile:
                     self._text = infile.read()
                     self._ast = None  # Remove the AST cache.
-                self.modified = os.path.getmtime(filepath)
             except OSError:           # No text file for dir.
                 self._text = ""
                 self._ast = None      # Remove the AST cache.
-                self.modified = os.path.getmtime(abspath)
+            self.modified = os.path.getmtime(abspath) # Directory's time!
             self._files = {}          # Needed only during read of subnotes.
             for filename in sorted(os.listdir(abspath)):
                 if filename.startswith("."): continue
@@ -395,7 +392,7 @@ class Note:
             # Attached files recorded in supernote.
             try:
                 self.file_extension = self.supernote._files[self.title]
-                self.file_size = os.stat(self.absfilepath).st_size
+                self.file_size = os.stat(self.abspathfile).st_size
             except KeyError:
                 pass
 
@@ -483,8 +480,8 @@ class Note:
             else:
                 os.remove(absfilepath)
         note = Note(self, title)
-        note.text = text        # This also adds backlinks.
         self.subnotes.sort()
+        note.text = text        # This also adds backlinks.
         note.write()
         note.put_recent()
         return note
@@ -519,7 +516,7 @@ class Note:
         old_abspath = self.abspath
         # Save file path for any attached file.
         if self.file_extension:
-            old_absfilepath = self.absfilepath
+            old_abspathfile = self.abspathfile
         # If the new supernote is a file, then convert it to a directory.
         abspath = supernote.abspath
         absfilepath = abspath + ".md"
@@ -529,8 +526,9 @@ class Note:
                 os.rename(absfilepath, os.path.join(abspath, "__text__.md"))
             else:
                 os.remove(absfilepath)
-        # Actually set the new supernote; move the note/directory.
-        self.supernote.subnotes.remove(self)
+        # Actually set the new supernote; move the file/directory of the note.
+        old_supernote = self.supernote
+        old_supernote.subnotes.remove(self)
         self.supernote = supernote
         self.supernote.subnotes.append(self)
         self.supernote.subnotes.sort()
@@ -542,13 +540,21 @@ class Note:
             os.rename(old_abspath + ".md", abspath)
         # Move the attached file if there is one.
         if self.file_extension:
-            os.rename(old_absfilepath, self.absfilepath)
-        # Set modified timestamp of the file/directory.
+            os.rename(old_abspathfile, self.abspathfile)
+        # Set modified timestamp of the moved file/directory.
         now = time.time()
         os.utime(abspath, (now, now))
         self.modified = now
         # Add this note to recently changed.
         self.put_recent()
+        # Convert the old supernote to file, if no other subnotes in it.
+        if len(old_supernote.subnotes) == 0:
+            with open(old_supernote.abspath + ".md", "w") as outfile:
+                outfile.write(old_supernote.text)
+            try:
+                os.remove(os.path.join(old_supernote.abspath, "__text__.md"))
+            except OSError:
+                pass
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
@@ -583,7 +589,7 @@ class Note:
         self.remove_recent()
         os.remove(self.abspath + ".md")
         if self.file_extension:
-            os.remove(self.absfilepath)
+            os.remove(self.abspathfile)
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer. Not root!
         if self.supernote.count == 0 and self.supernote is not None:
@@ -595,6 +601,33 @@ class Note:
                 with open(abspath + ".md", "w") as outfile:
                     outfile.write(sels.supernote.text)
             os.rmdir(abspath)
+
+    def check_synced_filesystem(self):
+        "When DEBUG: Check that this note is synced with its storage on disk."
+        if not flask.current_app.config["DEBUG"]: return
+        if self.subnotes:
+            if not os.path.isdir(self.abspath):
+                raise ValueError(f"'{self}' contains subnotes but is not a directory")
+            try:
+                with open(os.path.join(self.abspath, "__text__.md")) as infile:
+                    text = infile.read()
+            except OSError:
+                text = ""
+            modified = os.path.getmtime(self.abspath)
+        else:
+            abspath = self.abspath + ".md"
+            if not os.path.isfile(abspath):
+                raise ValueError(f"{self} has no subnotes but is not a file")
+            with open(abspath) as infile:
+                text = infile.read()
+            modified = os.path.getmtime(abspath)
+        if text != self.text:
+            print(type(text), len(text), text)
+            print(type(self.text), len(self.text), self.text)
+            raise ValueError(f"'{self}' text differs from file")
+        if modified != self.modified:
+            raise ValueError(f"'{self}' modified differs from file")
+        flask.current_app.logger.debug(f"Checked_synced_filesystem '{self}'")
 
 
 class Timer:
@@ -717,6 +750,89 @@ def get_recent(): return list(RECENT)
 
 def get_hashtags(): return sorted(HASHTAGS.keys())
 
+def check_recent_ordered():
+    "When DEBUG: If RECENT is not ordered, print it and raise ValueError."
+    if not flask.current_app.config["DEBUG"]: return
+    latest = RECENT[0]
+    for note in RECENT:
+        if note.modified > latest.modified:
+            for n in RECENT:
+                print(n.modified, n)
+            raise ValueError("RECENT out of order.")
+    flask.current_app.logger.debug("checked_recent_ordered done")
+
+def check_synced_filesystem():
+    "When DEBUG: Check that all notes in memory exist as files/directories."
+    if not flask.current_app.config["DEBUG"]: return
+    for note in ROOT.traverse():
+        note.check_synced_filesystem()
+    flask.current_app.logger.debug("checked_synced_filesystem for all notes")
+
+def check_synced_memory():
+    "When DEBUG: Check that files/directories exist as notes in memory."
+    if not flask.current_app.config["DEBUG"]: return
+    root = flask.current_app.config["NOTEBOOK_DIRPATH"]
+    try:
+        abspath = os.path.join(root, "__text__.md")
+        with open(abspath) as infile:
+            text = infile.read()
+    except OSError:
+        text = ""
+    if text != ROOT.text:
+        raise ValueError(f"file {abspath} text differs from ROOT")
+    if os.path.getmtime(root) != ROOT.modified:
+        raise ValueError(f"directory {root} modified differs from ROOT")
+    for dirpath, dirnames, filenames in os.walk(root):
+        for dirname in dirnames:
+            abspath = os.path.join(dirpath, dirname)
+            path = abspath[len(root)+1:]
+            try:
+                note = get_note(path)
+            except KeyError:
+                raise ValueError(f"No note for directory {abspath}")
+            if not note.subnotes:
+                raise ValueError(f"Directory {abspath} note has no subnotes")
+            if os.path.getmtime(abspath) != note.modified:
+                raise ValueError(f"directory {abspath} modified differs"
+                                 f" from '{note}'")
+            try:
+                textabspath = os.path.join(abspath, "__text__.md")
+                with open(textabspath) as infile:
+                    text = infile.read()
+            except OSError:
+                text = ""
+            if text != note.text:
+                raise ValueError(f"file {textabspath} text differs from '{note}'")
+            if os.path.getmtime(abspath) != note.modified:
+                raise ValueError(f"'{path}' modified differs from directory")
+                
+        for filename in filenames:
+            abspath = os.path.join(dirpath, filename)
+            basename, ext = os.path.splitext(filename)
+            if basename.startswith("_"): continue
+            path = os.path.join(dirpath, basename)[len(root)+1:]
+            if ext == ".md":
+                try:
+                    note = get_note(path)
+                except KeyError:
+                    raise ValueError(f"No note for file {abspath}")
+                with open(abspath) as infile:
+                    text = infile.read()
+                if text != note.text:
+                    raise ValueError(f"file {abspath} text differs from '{note}'")
+            else:
+                try:
+                    note = get_note(path)
+                except KeyError:
+                    raise ValueError(f"No note for non-md file {abspath}")
+                if ext != note.file_extension:
+                    raise ValueError(f"Non-md file {abspath} extension"
+                                     f" does not match '{note}'")
+                if os.path.getsize(abspath) != note.file_size:
+                    raise ValueError(f"Non-md file {abspath} size"
+                                     f" does not match '{note}'")
+    flask.current_app.logger.debug("checked_synced_memory for all notes")
+
 
 app = flask.Flask(__name__)
 
@@ -763,6 +879,9 @@ def setup():
     for note in ROOT.traverse():
         note.add_backlinks()
         note.add_hashtags()
+    check_recent_ordered()
+    check_synced_filesystem()
+    check_synced_memory()
     flash_message(f"Setup {timer}")
 
 @app.context_processor
@@ -845,6 +964,9 @@ def create():
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
+        check_recent_ordered()
+        check_synced_filesystem()
+        check_synced_memory()
         return flask.redirect(note.url)
 
 @app.route("/note/<path:path>")
@@ -868,11 +990,11 @@ def file(path):
     if not note.file_extension:
         raise KeyError(f"No file attached to note '{path}'")
     if flask.request.values.get("download"):
-        return flask.send_file(note.absfilepath,
+        return flask.send_file(note.abspathfile,
                                conditional=False,
                                as_attachment=True)
     else:
-        return flask.send_file(note.absfilepath, conditional=False)
+        return flask.send_file(note.abspathfile, conditional=False)
 
 @app.route("/edit/", methods=["GET", "POST"])
 @app.route("/edit/<path:path>", methods=["GET", "POST"])
@@ -901,7 +1023,7 @@ def edit(path=""):
         except KeyError as error:
             flash_error(f"Note already exists: '{title}'")
             return flask.redirect(flask.url_for("edit", path=path))
-        note.text = flask.request.form.get("text") or ''
+        note.text = flask.request.form.get("text") or ""
         if flask.request.form.get("removefile"):
             note.remove_file()
         else:
@@ -909,6 +1031,9 @@ def edit(path=""):
             if upload:
                 note.upload_file(upload.read(),
                                  os.path.splitext(upload.filename)[1])      
+        check_recent_ordered()
+        check_synced_filesystem()
+        check_synced_memory()
         return flask.redirect(note.url)
 
 @app.route("/move/<path:path>", methods=["GET", "POST"])
@@ -940,6 +1065,9 @@ def move(path):
             note.move(supernote)
         except ValueError as error:
             flash_error(error)
+        check_recent_ordered()
+        check_synced_filesystem()
+        check_synced_memory()
         return flask.redirect(note.url)
 
 @app.route("/delete/<path:path>", methods=["POST"])
@@ -955,6 +1083,9 @@ def delete(path):
     except ValueError as error:
         flash_error(error)
         return flask.redirect(note.url)
+    check_recent_ordered()
+    check_synced_filesystem()
+    check_synced_memory()
     return flask.redirect(note.supernote.url)
 
 @app.route("/star/<path:path>", methods=["POST"])
