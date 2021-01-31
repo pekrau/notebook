@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.8.3"
+__version__ = "0.8.4"
 
 import collections
 import json
@@ -13,12 +13,11 @@ import marko.ast_renderer
 import jinja2.utils
 
 
-ROOT = None           # The root note. Created in 'setup'
-LOOKUP = dict()       # Lookup path->note
-STARRED = set()       # Notes
-RECENT = None         # Deque of recently modified note. Created in 'setup'
-BACKLINKS = dict()    # Lookup target note path -> set of source target paths
-HASHTAGS = dict()     # Lookup word -> set of note paths
+ROOT = None           # The root note. Created in 'setup'.
+STARRED = set()       # Starred notes.
+RECENT = None         # Deque of recently modified note. Created in 'setup'.
+BACKLINKS = dict()    # Lookup target note path -> set of source target paths.
+HASHTAGS = dict()     # Lookup word -> set of note paths.
 
 
 def get_settings():
@@ -128,14 +127,11 @@ class Note:
                 linking.update(BACKLINKS[note.path])
             except KeyError:
                 pass
-        linking = [LOOKUP[p] for p in linking]
+        linking = [get_note(p) for p in linking]
         # Remove all backlinks and hashtags while old paths.
         for note in linking:
             note.remove_backlinks()
             note.remove_hashtags()
-        # Remove this note and below from the path->note lookup while old path.
-        for note in changing:
-            note.remove_lookup()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -158,9 +154,6 @@ class Note:
         self.modified = now
         # Add this note to recently changed.
         self.put_recent()
-        # Add this note and below to path->note lookup with new path.
-        for note in changing:
-            note.add_lookup()
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
@@ -406,17 +399,9 @@ class Note:
             except KeyError:
                 pass
 
-    def add_lookup(self):
-        "Add the note to the path->note lookup."
-        LOOKUP[self.path] = self
-
-    def remove_lookup(self, path=None):
-        "Remove the note from the path->note lookup."
-        LOOKUP.pop(path or self.path)
-
     def get_backlinks(self):
         "Get the notes linking to this note."
-        return sorted([LOOKUP[p] for p in BACKLINKS.get(self.path, [])])
+        return sorted([get_note(p) for p in BACKLINKS.get(self.path, [])])
 
     def add_backlinks(self):
         "Add the links to other notes in this note to the lookup."
@@ -501,7 +486,6 @@ class Note:
         note.text = text        # This also adds backlinks.
         self.subnotes.sort()
         note.write()
-        note.add_lookup()
         note.put_recent()
         return note
 
@@ -526,14 +510,11 @@ class Note:
                 linking.update(BACKLINKS[note.path])
             except KeyError:
                 pass
-        linking = [LOOKUP[p] for p in linking]
+        linking = [get_note(p) for p in linking]
         # Remove all backlinks and hashtags while old paths.
         for note in linking:
             note.remove_backlinks()
             note.remove_hashtags()
-        # Remove this note and below from the path->note lookup while old path.
-        for note in changing:
-            note.remove_lookup()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -568,9 +549,6 @@ class Note:
         self.modified = now
         # Add this note to recently changed.
         self.put_recent()
-        # Add this note and below to path->note lookup with new path.
-        for note in changing:
-            note.add_lookup()
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
@@ -599,7 +577,6 @@ class Note:
         "Delete this note."
         if not self.is_deletable():
             raise ValueError("This note may not be deleted.")
-        self.remove_lookup()
         self.remove_backlinks()
         self.remove_hashtags()
         self.star(remove=True)
@@ -650,7 +627,7 @@ class NoteLink(marko.inline.InlineElement):
 class NoteLinkRendererMixin:
     def render_note_link(self, element):
         try:
-            note = LOOKUP[element.ref]
+            note = get_note(element.ref)
         except KeyError:
             # Stale link; target does not exist.
             return f'<span class="text-danger">{element.ref}</span>'
@@ -719,6 +696,21 @@ def flash_warning(msg): flask.flash(str(msg), "warning")
 
 def flash_message(msg): flask.flash(str(msg), "message")
 
+def get_note(path):
+    "Get the note given its path."
+    if not path: return ROOT
+    note = ROOT
+    parts = list(reversed(path.split("/")))
+    while parts:
+        title = parts.pop()
+        for subnote in note.subnotes:
+            if title == subnote.title:
+                note = subnote
+                break
+        else:
+            raise KeyError(f"No such note '{path}'.")
+    return note
+
 def get_starred(): return sorted(STARRED)
 
 def get_recent(): return list(RECENT)
@@ -734,7 +726,6 @@ app.add_template_filter(localtime)
 @app.before_first_request
 def setup():
     """Read all notes and keep in memory. Set up:
-    - Lookup:  path->note
     - List of recent notes
     - List of starred notes
     - Set up map of backlinks
@@ -743,17 +734,12 @@ def setup():
     timer = Timer()
     global ROOT
     global RECENT
-    LOOKUP.clear()
     STARRED.clear()
     BACKLINKS.clear()
     HASHTAGS.clear()
-    # Read in all notes, add to the path->note lookup.
+    # Read in all notes.
     ROOT = Note(None, None)
     ROOT.read()
-    traverser = ROOT.traverse()
-    next(traverser)             # Skip root note.
-    for note in traverser:
-        note.add_lookup()
     # Set up most recently modified notes.
     traverser = ROOT.traverse()
     next(traverser)             # Skip root note.
@@ -768,7 +754,7 @@ def setup():
         with open(filepath) as infile:
             for path in json.load(infile)["paths"]:
                 try:
-                    STARRED.add(LOOKUP[path])
+                    STARRED.add(get_note(path))
                 except KeyError:
                     pass
     except OSError:
@@ -817,11 +803,11 @@ def create():
     "Create a new note, optionally with an uploaded file."
     if flask.request.method == "GET":
         try:
-            supernote = LOOKUP[flask.request.values["supernote"]]
+            supernote = get_note(flask.request.values["supernote"])
         except KeyError:
             supernote = None    # Root supernote.
         try:
-            source = LOOKUP[flask.request.values["source"]]
+            source = get_note(flask.request.values["source"])
         except KeyError:
             source = None
         return flask.render_template("create.html",
@@ -837,7 +823,7 @@ def create():
             supernote = ROOT
         else:
             try:
-                supernote = LOOKUP[superpath]
+                supernote = get_note(superpath)
             except KeyError:
                 flash_error(f"No such supernote: '{superpath}'")
                 return flask.redirect(flask.url_for("home"))
@@ -865,7 +851,7 @@ def create():
 def note(path):
     "Display page for the given note."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
@@ -875,7 +861,7 @@ def note(path):
 def file(path):
     "Return the file for the given note. Optionally for download."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
@@ -893,7 +879,7 @@ def file(path):
 def edit(path=""):
     "Edit the given note; title (i.e. file/directory rename) and/or text."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         if not path:
             note = ROOT
@@ -929,7 +915,7 @@ def edit(path=""):
 def move(path):
     "Move the given note to a new supernote."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
@@ -947,7 +933,7 @@ def move(path):
         if supernote.endswith("]]"):
             supernote = supernote[:-2]
         try:
-            supernote = LOOKUP[supernote]
+            supernote = get_note(supernote)
         except KeyError:
             flash_error(f"No such supernote: '{supernote}'")
         try:
@@ -960,7 +946,7 @@ def move(path):
 def delete(path):
     "Delete the given note."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
@@ -975,7 +961,7 @@ def delete(path):
 def star(path):
     "Toggle the star state of the note for the path."
     try:
-        note = LOOKUP[path]
+        note = get_note(path)
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
@@ -984,7 +970,7 @@ def star(path):
 
 @app.route("/hashtag/<word>")
 def hashtag(word):
-    notes = [LOOKUP[p] for p in HASHTAGS.get(word, [])]
+    notes = [get_note(p) for p in HASHTAGS.get(word, [])]
     return flask.render_template("hashtag.html", word=word, notes=notes)
 
 @app.route("/search")
