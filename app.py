@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.8.5"
+__version__ = "0.8.6"
 
 import collections
 import json
@@ -16,8 +16,8 @@ import jinja2.utils
 ROOT = None           # The root note. Created in 'setup'.
 STARRED = set()       # Starred notes.
 RECENT = None         # Deque of recently modified note. Created in 'setup'.
-BACKLINKS = dict()    # Lookup target note path -> set of source target paths.
-HASHTAGS = dict()     # Lookup word -> set of note paths.
+BACKLINKS = dict()    # Lookup of target note path -> set of source note paths.
+HASHTAGS = dict()     # Lookup of word -> set of note paths.
 
 
 def get_settings():
@@ -138,6 +138,8 @@ class Note:
         # Save file path for any attached file.
         if self.file_extension:
             old_abspathfile = self.abspathfile
+        # Save modified time for supernote directory, to reset it.
+        stat = os.stat(self.supernote.abspath)
         # Actually change the title of the note; rename the file/directory.
         self._title = title
         if os.path.isdir(old_abspath):
@@ -153,6 +155,8 @@ class Note:
         now = time.time()
         os.utime(abspath, (now, now))
         self.modified = now
+        # Reset the modified time for the supernote.
+        os.utime(self.supernote.abspath, (stat.st_atime, stat.st_mtime))
         # Add this note to recently changed.
         self.put_recent()
         # Get the new path for each note whose path was changed.
@@ -161,8 +165,10 @@ class Note:
             text = note.text
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
+            if note._text != text:
+                print("changed text >>>", note)
             note._text = text   # Do not add backlinks just yet.
-            note._ast = None    # Force recompile.
+            note._ast = None    # Force recompile of AST.
             note.write(update_modified=False)
         # Add back backlinks and hashtags with new the paths.
         for note in linking:
@@ -190,6 +196,7 @@ class Note:
 
     @property
     def ast(self):
+        "Force recompile of the AST by setting its cache to None."
         if self._ast is None:
             self._ast = get_md_ast_parser().convert(self.text)
         return self._ast
@@ -319,7 +326,7 @@ class Note:
         if update_modified or stat is None:
             self.modified = os.path.getmtime(abspath)
         else:
-            os.utime(abspath, (stat.st_atime, stat.st_ctime))
+            os.utime(abspath, (stat.st_atime, stat.st_mtime))
 
     def upload_file(self, content, extension):
         """Upload the file given by content and filename extension.
@@ -360,23 +367,26 @@ class Note:
                 filepath = os.path.join(abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
-                    self._ast = None  # Remove the AST cache.
             except OSError:           # No text file for dir.
                 self._text = ""
-                self._ast = None      # Remove the AST cache.
-            self.modified = os.path.getmtime(abspath) # Directory's time!
+            self._ast = None          # Force recompile of AST.
+            self.modified = os.path.getmtime(abspath) # Directory's timestamp!
             self._files = {}          # Needed only during read of subnotes.
+            basenames = []
             for filename in sorted(os.listdir(abspath)):
-                if filename.startswith("."): continue
                 if filename.startswith("_"): continue
                 if filename.endswith("~"): continue
                 basename, extension = os.path.splitext(filename)
+                # Proper note file; handle once directory listing is done.
+                if not extension or extension == ".md":
+                    basenames.append(basename)
                 # Record attached files for later.
-                if extension and extension != ".md":
-                    self._files[basename] = extension
                 else:
-                    note = Note(self, basename)
-                    note.read()
+                    self._files[basename] = extension
+            # Actually read subnotes when all files have been cycled over.
+            for basename in basenames:
+                note = Note(self, basename)
+                note.read()
             del self._files     # No longer needed.
         else:
             # It's a file; no subnotes.
@@ -605,6 +615,7 @@ class Note:
     def check_synced_filesystem(self):
         "When DEBUG: Check that this note is synced with its storage on disk."
         if not flask.current_app.config["DEBUG"]: return
+        flask.current_app.logger.debug(f"check_synced_filesystem '{self}'")
         if self.subnotes:
             if not os.path.isdir(self.abspath):
                 raise ValueError(f"'{self}' contains subnotes but is not a directory")
@@ -622,12 +633,9 @@ class Note:
                 text = infile.read()
             modified = os.path.getmtime(abspath)
         if text != self.text:
-            print(type(text), len(text), text)
-            print(type(self.text), len(self.text), self.text)
             raise ValueError(f"'{self}' text differs from file")
         if modified != self.modified:
             raise ValueError(f"'{self}' modified differs from file")
-        flask.current_app.logger.debug(f"Checked_synced_filesystem '{self}'")
 
 
 class Timer:
@@ -753,24 +761,24 @@ def get_hashtags(): return sorted(HASHTAGS.keys())
 def check_recent_ordered():
     "When DEBUG: If RECENT is not ordered, print it and raise ValueError."
     if not flask.current_app.config["DEBUG"]: return
+    flask.current_app.logger.debug("checked_recent_ordered")
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
-            for n in RECENT:
-                print(n.modified, n)
-            raise ValueError("RECENT out of order.")
-    flask.current_app.logger.debug("checked_recent_ordered done")
+            content = "\n".join([f"{n.modified}  {n}" for n in RECENT])
+            raise ValueError(f"RECENT out of order:\n{content}")
 
 def check_synced_filesystem():
     "When DEBUG: Check that all notes in memory exist as files/directories."
     if not flask.current_app.config["DEBUG"]: return
+    flask.current_app.logger.debug("checked_synced_filesystem for all notes")
     for note in ROOT.traverse():
         note.check_synced_filesystem()
-    flask.current_app.logger.debug("checked_synced_filesystem for all notes")
 
 def check_synced_memory():
     "When DEBUG: Check that files/directories exist as notes in memory."
     if not flask.current_app.config["DEBUG"]: return
+    flask.current_app.logger.debug("checked_synced_memory for all notes")
     root = flask.current_app.config["NOTEBOOK_DIRPATH"]
     try:
         abspath = os.path.join(root, "__text__.md")
@@ -824,14 +832,13 @@ def check_synced_memory():
                 try:
                     note = get_note(path)
                 except KeyError:
-                    raise ValueError(f"No note for non-md file {abspath}")
+                    raise ValueError(f"No note '{path}' for non-md file {abspath}")
                 if ext != note.file_extension:
                     raise ValueError(f"Non-md file {abspath} extension"
                                      f" does not match '{note}'")
                 if os.path.getsize(abspath) != note.file_size:
                     raise ValueError(f"Non-md file {abspath} size"
                                      f" does not match '{note}'")
-    flask.current_app.logger.debug("checked_synced_memory for all notes")
 
 
 app = flask.Flask(__name__)
