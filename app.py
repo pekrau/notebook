@@ -78,8 +78,6 @@ class Note:
         self._text = ""
         self._ast = None
         self.file_extension = None
-        self.file_size = None
-        self.modified = None
 
     def __repr__(self):
         return self.path
@@ -138,8 +136,6 @@ class Note:
         # Save file path for any attached file.
         if self.file_extension:
             old_abspathfile = self.abspathfile
-        # Save the modified timestamp for supernote directory.
-        stat = os.stat(self.supernote.abspath)
         # Actually change the title of the note; rename the file/directory.
         self._title = title
         if os.path.isdir(old_abspath):
@@ -151,14 +147,8 @@ class Note:
         # Rename the attached file if there is one.
         if self.file_extension:
             os.rename(old_abspathfile, self.abspathfile)
-        # Force the modified timestamp of the file/directory.
-        now = time.time()
-        os.utime(abspath, (now, now))
-        self.modified = now
-        # Reset the modified timestamp for the supernote.
-        os.utime(self.supernote.abspath, (stat.st_atime, stat.st_mtime))
-        # Add this note to recently changed.
-        self.put_recent()
+        # Force the modified timestamp of the file to now.
+        self.set_modified()
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
@@ -172,6 +162,7 @@ class Note:
         for note in linking:
             note.add_backlinks()
             note.add_hashtags()
+        check_backlinks()
 
     title = property(get_title, set_title, doc="The title of the note.")
 
@@ -180,21 +171,38 @@ class Note:
 
     def set_text(self, text):
         text = text.replace("\r", "")
-        if text == self._text: return
         self.remove_backlinks()
         self.remove_hashtags()
         self._text = text
-        self._ast = None
+        self._ast = None        # Force recompile of AST.
         self.add_backlinks()
         self.add_hashtags()
         self.write()
+        check_backlinks()
 
     text = property(get_text, set_text,
                     doc="The text of the note using Markdown format.")
 
+    def get_modified(self):
+        if self.subnotes:
+            return os.path.getmtime(os.path.join(self.abspath, "__text__.md"))
+        else:
+            return os.path.getmtime(self.abspath + ".md")
+
+    def set_modified(self, value=None):
+        if value is None:
+            value = time.time()
+        if self.subnotes:
+            os.utime(os.path.join(self.abspath, "__text__.md"), (value, value))
+        else:
+            os.utime(self.abspath + ".md", (value, value))
+
+    modified = property(get_modified, set_modified,
+                        doc="The modification timestamp of the note.")
+
     @property
     def ast(self):
-        "Force recompile of the AST by setting its cache to None."
+        "Set the private variable to None to force recompile of the AST."
         if self._ast is None:
             self._ast = get_md_ast_parser().convert(self.text)
         return self._ast
@@ -239,6 +247,10 @@ class Note:
     @property
     def file(self):
         return bool(self.file_extension)
+
+    @property
+    def file_size(self):
+        return os.path.getsize(self.abspathfile)
 
     @property
     def count(self):
@@ -300,20 +312,14 @@ class Note:
 
     def write(self, update_modified=True):
         "Write this note to disk. Does *not* write subnotes."
-        # The supernote's modified timestamp should not change: remember it.
-        if self.supernote:
-            superstat = os.stat(self.supernote.abspath)
         if os.path.isdir(self.abspath):
-            abspath = self.abspath
-            stat = os.stat(abspath)
-            if self.text:       # Only write dir text if anything to write.
-                with open(os.path.join(abspath, "__text__.md"), "w") as outfile:
-                    outfile.write(self.text)
-            else:
-                try:            # Remove the dir text file, if any.
-                    os.remove(os.path.join(abspath, "__text__.md"))
-                except OSError:
-                    pass
+            abspath = os.path.join(self.abspath, "__text__.md")
+            try:
+                stat = os.stat(abspath)
+            except OSError:     # Fallback to directory if no text file.
+                stat = os.stat(self.abspath)
+            with open(abspath, "w") as outfile:
+                outfile.write(self.text)
         else:
             abspath = self.abspath + ".md"
             try:
@@ -322,20 +328,15 @@ class Note:
                 stat = None
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
-        if update_modified or stat is None:
-            self.modified = os.path.getmtime(abspath)
-        else:
+        if not update_modified and stat:
             os.utime(abspath, (stat.st_atime, stat.st_mtime))
-        # Reset the supernote's timestamp.
-        if self.supernote:
-            os.utime(self.supernote.abspath, (superstat.st_atime,
-                                              superstat.st_mtime))
 
     def upload_file(self, content, extension):
         """Upload the file given by content and filename extension.
-        Does NOT change the modified datetime, nor puts the note into
-        the list of recently modified notes. It is assumed that the note
-        was also modified at the same time. XXX Reconsider this.
+        Does NOT change the modified timestamp, nor puts the note into
+        the list of recently modified notes.
+        NOTE: This is based on the assumption that the note was also
+        modified in some other way in the same operation.
         """
         if self is ROOT:
             raise ValueError("Cannot attach a file to the root note.")
@@ -345,8 +346,6 @@ class Note:
         # Non-extension upload must have some extension.
         elif not extension:
             extension = ".bin"
-        # Save the modified timestamp for the directory containing this note.
-        stat = os.stat(self.supernote.abspath)
         # Remove any existing attached file; may have different extension
         if self.file_extension:
             os.remove(self.abspathfile)
@@ -355,8 +354,6 @@ class Note:
             outfile.write(content)
         self.file_extension = extension
         self.file_size = len(content)
-        # Reset the modified timestamp for the directory containing this note.
-        os.utime(self.supernote.abspath, (stat.st_atime, stat.st_mtime))
 
     def remove_file(self):
         "Remove the attached file, if any."
@@ -367,20 +364,25 @@ class Note:
 
     def read(self):
         "Read this note and its subnotes from disk."
-        abspath = self.abspath
-        if os.path.exists(abspath):
+        if os.path.exists(self.abspath):
             # It's a directory with subnotes.
             try:
-                filepath = os.path.join(abspath, "__text__.md")
+                filepath = os.path.join(self.abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
-            except OSError:           # No text file for dir.
+            except OSError:           # No text file for directory.
                 self._text = ""
+                 # Fallback: Use directory's timestamp!
+                stat = os.stat(self.abspath)
+                # Create an empty text file.
+                filepath = os.path.join(self.abspath, "__text__.md")
+                with open(filepath, "w") as outfile:
+                    outfile.write("")
+                os.utime(filepath, (stat.st_atime, stat.st_mtime))
             self._ast = None          # Force recompile of AST.
-            self.modified = os.path.getmtime(abspath) # Directory's timestamp!
             self._files = {}          # Needed only during read of subnotes.
             basenames = []
-            for filename in sorted(os.listdir(abspath)):
+            for filename in sorted(os.listdir(self.abspath)):
                 if filename.startswith("_"): continue
                 if filename.endswith("~"): continue
                 basename, extension = os.path.splitext(filename)
@@ -397,11 +399,10 @@ class Note:
             del self._files     # No longer needed.
         else:
             # It's a file; no subnotes.
-            filepath = abspath + ".md"
+            filepath = self.abspath + ".md"
             with open(filepath) as infile:
                 self._text = infile.read()
                 self._ast = None      # Remove the AST cache.
-            self.modified = os.path.getmtime(filepath)
         # Both directory (except root) and file note may have
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
@@ -409,7 +410,6 @@ class Note:
             # Attached files recorded in supernote.
             try:
                 self.file_extension = self.supernote._files[self.title]
-                self.file_size = os.stat(self.abspathfile).st_size
             except KeyError:
                 pass
 
@@ -494,23 +494,14 @@ class Note:
         # If this note is a file, then convert it into a directory.
         absfilepath = self.abspath + ".md"
         if os.path.isfile(absfilepath):
-            stat = os.stat(absfilepath)     # Save timestamp for reset.
             os.mkdir(self.abspath)
-            if os.path.getsize(absfilepath):
-                os.rename(absfilepath, os.path.join(self.abspath,"__text__.md"))
-            else:
-                os.remove(absfilepath)
-        else:
-            # Save the modified timestamp of this directory.
-            stat = os.stat(self.abspath)
+            os.rename(absfilepath, os.path.join(self.abspath, "__text__.md"))
         note = Note(self, title)
         self.subnotes.sort()
         # Set the text of the subnote; this also adds backlinks.
         note.text = text
         note.write()
         note.put_recent()
-        # Reset the timestamps of the directory containing this note.
-        os.utime(self.abspath, (stat.st_atime, stat.st_mtime))
         return note
 
     def move(self, supernote):
@@ -534,6 +525,9 @@ class Note:
                 pass
         linking = [get_note(path) for path in linking]
         # Remove all backlinks and hashtags while old paths.
+        for note in changing:
+            note.remove_backlinks()
+            note.remove_hashtags()
         for note in linking:
             note.remove_backlinks()
             note.remove_hashtags()
@@ -545,18 +539,11 @@ class Note:
         # If the new supernote is a file, then convert it first to a directory.
         super_absfilepath = supernote.abspath + ".md"
         if os.path.isfile(super_absfilepath):
-            new_superstat = os.stat(super_absfilepath)  # Save timestamp; reset.
             os.mkdir(supernote.abspath)
-            if os.path.getsize(super_absfilepath):
-                os.rename(super_absfilepath,
-                          os.path.join(supernote.abspath, "__text__.md"))
-            else:
-                os.remove(super_absfilepath)
-        else:
-            new_superstat = os.stat(supernote.abspath)  # Save timestamp; reset.
+            os.rename(super_absfilepath,
+                      os.path.join(supernote.abspath, "__text__.md"))
         # Remember old supernote.
         old_supernote = self.supernote
-        old_superstat = os.stat(old_supernote.abspath)
         # Actually set the new supernote; move the file/directory of the note.
         old_supernote.subnotes.remove(self)
         self.supernote = supernote
@@ -571,34 +558,11 @@ class Note:
         # Move the attached file if there is one.
         if self.file_extension:
             os.rename(old_abspathfile, self.abspathfile)
-        # Set modified timestamp of the moved file/directory.
-        self.modified = time.time()
-        os.utime(new_abspath, (self.modified, self.modified))
-        # Add this note to recently changed.
-        self.put_recent()
-        # Save modified timestamp of old supernote's supernote.
-        if old_supernote.supernote:
-            stat = os.stat(old_supernote.supernote.abspath)
         # Convert the old supernote to file, if no other subnotes in it.
         if len(old_supernote.subnotes) == 0:
             old_supernote_fileabspath = old_supernote.abspath + ".md"
             with open(old_fileabspath, "w") as outfile:
                 outfile.write(old_supernote.text)
-            try:
-                os.remove(os.path.join(old_supernote.abspath, "__text__.md"))
-            except OSError:
-                pass
-            # Restore the modified timestamp of the old supernote.
-            os.utime(old_supernote_fileabspath, (old_superstat.st_atime,
-                                                 old_superstat.st_mtime))
-        else:
-            # Restore the timestamps of the old supernote.
-            os.utime(old_supernote.abspath, (old_superstat.st_atime,
-                                             old_superstat.st_mtime))
-        # Restore the modified timestamp of the old supernote's supernote.
-        if old_supernote.supernote:
-            os.utime(old_supernote.supernote.abspath, (stat.st_atime,
-                                                       stat.st_mtime))
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
@@ -609,9 +573,14 @@ class Note:
             note._ast = None    # Force recompile.
             note.write(update_modified=False)
         # Add back backlinks and hashtags with new the paths.
+        for note in changing:
+            note.add_backlinks()
+            note.add_hashtags()
         for note in linking:
             note.add_backlinks()
             note.add_hashtags()
+        # Add this note to recently changed.
+        self.put_recent()
 
     def is_deletable(self):
         """May this note be deleted?
@@ -658,19 +627,14 @@ class Note:
                     text = infile.read()
             except OSError:
                 text = ""
-            modified = os.path.getmtime(self.abspath)
         else:
             abspath = self.abspath + ".md"
             if not os.path.isfile(abspath):
                 raise ValueError(f"{self} has no subnotes but is not a file")
             with open(abspath) as infile:
                 text = infile.read()
-            modified = os.path.getmtime(abspath)
         if text != self.text:
             raise ValueError(f"'{self}' text differs from file")
-        if modified != self.modified:
-            raise ValueError(f"'{self}' modified {localtime(self.modified)}"
-                             f" differs from file {localtime(modified)}")
 
 
 class Timer:
@@ -800,7 +764,7 @@ def check_recent_ordered():
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
-            content = "\n".join([f"{n.modified}  {n}" for n in RECENT])
+            content = "\n".join([f"{localtime(n.modified)}  {n}" for n in RECENT])
             raise ValueError(f"RECENT out of order:\n{content}")
 
 def check_synced_filesystem():
@@ -823,8 +787,6 @@ def check_synced_memory():
         text = ""
     if text != ROOT.text:
         raise ValueError(f"file {abspath} text differs from ROOT")
-    if os.path.getmtime(root) != ROOT.modified:
-        raise ValueError(f"directory {root} modified differs from ROOT")
     for dirpath, dirnames, filenames in os.walk(root):
         for dirname in dirnames:
             abspath = os.path.join(dirpath, dirname)
@@ -835,9 +797,6 @@ def check_synced_memory():
                 raise ValueError(f"No note for directory {abspath}")
             if not note.subnotes:
                 raise ValueError(f"Directory {abspath} note has no subnotes")
-            if os.path.getmtime(abspath) != note.modified:
-                raise ValueError(f"directory {abspath} modified differs"
-                                 f" from '{note}'")
             try:
                 textabspath = os.path.join(abspath, "__text__.md")
                 with open(textabspath) as infile:
@@ -846,8 +805,6 @@ def check_synced_memory():
                 text = ""
             if text != note.text:
                 raise ValueError(f"file {textabspath} text differs from '{note}'")
-            if os.path.getmtime(abspath) != note.modified:
-                raise ValueError(f"'{path}' modified differs from directory")
                 
         for filename in filenames:
             abspath = os.path.join(dirpath, filename)
@@ -1080,7 +1037,9 @@ def edit(path=""):
         except KeyError as error:
             flash_error(f"Note already exists: '{title}'")
             return flask.redirect(flask.url_for("edit", path=path))
+        # Actually change text; should update links, etc.
         note.text = flask.request.form.get("text") or ""
+        # Handle file remove or upload.
         if flask.request.form.get("removefile"):
             note.remove_file()
         else:

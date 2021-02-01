@@ -1,4 +1,4 @@
-Nivå 2. Ordinary [link](https://kraulis.se).
+Nivå 2. Ordinary [external link](https://kraulis.se).
 
 This is a [[link that is stale]].
 
