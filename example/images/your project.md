@@ -1,1 +1,1 @@
-Link to [[Copy of test renamed]].
+Link to [[Copy of test]].
