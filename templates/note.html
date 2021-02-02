@@ -3,25 +3,27 @@
 
 {% block head_title %}{{ note.title }}{% endblock %}
 {% block body_title %}
-  <form action="{{ url_for('star', path=note.path) }}" 
-        class="d-inline-flex align-middle"
-        method="POST">
-    {% if note.starred %}
-    <button type="submit" class="btn btn-outline-warning">
-      <span class="bi-star-fill" title="Unstar this note."></span>
-    </button>
-    {% else %}
-    <button type="submit" class="btn btn-outline-warning">
-      <span class="bi-star" title="Star this note."></span>
-    </button>
-    {% endif %}
-  </form>
-{{ note.title }}
-<button class="btn btn-clipboard btn-outline-none ps-0"
+<button class="btn btn-clipboard btn-outline-none p-0"
         data-clipboard-text="[[{{ note.path }}]]"
         title="Copy the path of the note to the clipboard.">
   <span class="bi-clipboard text-dark"></span>
 </button>
+<form action="{{ url_for('star', path=note.path) }}" 
+      class="d-inline-flex align-middle"
+      method="POST">
+  {% if note.starred %}
+  <button type="submit" class="btn btn-outline-warning"
+           title="Unstar this note.">
+    <span class="bi-star-fill"></span>
+  </button>
+  {% else %}
+  <button type="submit" class="btn btn-outline-warning"
+           title="Star this note.">
+    <span class="bi-star"></span>
+  </button>
+  {% endif %}
+</form>
+{{ note.title }}
 {% endblock %}
 
 {% block navbar %}
@@ -99,7 +101,14 @@
   Download file {{ note.file_size | filesizeformat }}
 </a>
 {% endif %}
-{{ macros.noteslist(note.subnotes, 2) }}
+{% if note.subnotes %}
+<div class="card">
+  <div class="card-header">Subnotes</div>
+  <div class="card-body">
+    {{ macros.noteslist(note.subnotes, 3) }}
+  </div>
+</div>
+{% endif %} {# if note.subnotes #}
 {% endblock %} {# block main #}
 
 {% block right %}

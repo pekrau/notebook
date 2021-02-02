@@ -67,7 +67,12 @@
 
 {% block main %}
 {{ root.text | markdown }}
-{{ macros.noteslist(root.subnotes, 2) }}
+<div class="card">
+  <div class="card-header">Subnotes</div>
+  <div class="card-body">
+    {{ macros.noteslist(root.subnotes, 3) }}
+  </div>
+</div>
 {% endblock %} {# block main #}
 
 {% block right %}

@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.8.7"
+__version__ = "0.9.0"
 
 import collections
 import json
@@ -15,9 +15,9 @@ import jinja2.utils
 
 ROOT = None           # The root note. Created in 'setup'.
 STARRED = set()       # Starred notes.
-RECENT = None         # Deque of recently modified note. Created in 'setup'.
-BACKLINKS = dict()    # Lookup of target note path -> set of source note paths.
-HASHTAGS = dict()     # Lookup of word -> set of note paths.
+RECENT = None         # Deque of recently modified notes. Created in 'setup'.
+BACKLINKS = dict()    # Lookup of target note -> set of source notes.
+HASHTAGS = dict()     # Lookup of word -> set of notes.
 
 
 def get_settings():
@@ -65,6 +65,8 @@ def write_settings():
             settings[key] = flask.current_app.config[key]
         json.dump(settings, outfile, indent=2)
 
+
+class CheckError(Exception): pass
 
 class Note:
     "Note and its subnotes, if any."
@@ -123,14 +125,11 @@ class Note:
         linking = set()
         for note in changing:
             try:
-                linking.update(BACKLINKS[note.path])
+                linking.update(BACKLINKS[note])
             except KeyError:
                 pass
-        linking = [get_note(path) for path in linking]
-        # Remove all backlinks and hashtags while old paths.
-        for note in linking:
-            note.remove_backlinks()
-            note.remove_hashtags()
+        print(f"changing title of '{self}' to '{title}';",
+              "linking >>>", linking)
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -158,11 +157,6 @@ class Note:
             note._text = text   # Do not add backlinks just yet.
             note._ast = None    # Force recompile of AST.
             note.write(update_modified=False)
-        # Add back backlinks and hashtags with new the paths.
-        for note in linking:
-            note.add_backlinks()
-            note.add_hashtags()
-        check_backlinks()
 
     title = property(get_title, set_title, doc="The title of the note.")
 
@@ -178,13 +172,12 @@ class Note:
         self.add_backlinks()
         self.add_hashtags()
         self.write()
-        check_backlinks()
 
     text = property(get_text, set_text,
                     doc="The text of the note using Markdown format.")
 
     def get_modified(self):
-        if self.subnotes:
+        if self.subnotes or self is ROOT:
             return os.path.getmtime(os.path.join(self.abspath, "__text__.md"))
         else:
             return os.path.getmtime(self.abspath + ".md")
@@ -281,7 +274,6 @@ class Note:
         if self.supernote is None: return
         self.remove_recent()
         RECENT.appendleft(self)
-        check_recent_ordered()
 
     def remove_recent(self):
         "Remove this note from the list of recently modified notes."
@@ -415,30 +407,29 @@ class Note:
 
     def get_backlinks(self):
         "Get the notes linking to this note."
-        return sorted([get_note(p) for p in BACKLINKS.get(self.path, [])])
+        return sorted(BACKLINKS.get(self, []))
 
     def add_backlinks(self):
         "Add the links to other notes in this note to the lookup."
-        path = self.path
-        for link in self.parse_linkpaths(self.ast["children"]):
+        for link in self.find_linkpaths(self.ast["children"]):
             try:
-                get_note(link)
-            except KeyError:
+                note = get_note(link)
+            except KeyError:    # Stale link.
                 pass
             else:
-                BACKLINKS.setdefault(link, set()).add(path)
+                BACKLINKS.setdefault(note, set()).add(self)
 
     def remove_backlinks(self):
         "Remove the links to other notes in this note from the lookup."
-        linkpaths = self.parse_linkpaths(self.ast["children"])
-        path = self.path
-        for link in linkpaths:
+        for link in self.find_linkpaths(self.ast["children"]):
             try:
-                BACKLINKS[link].remove(path)
-            except KeyError:    # When stale link.
+                note = get_note(link)
+            except KeyError:    # Stale link.
                 pass
+            else:
+                BACKLINKS[note].remove(self)
 
-    def parse_linkpaths(self, children):
+    def find_linkpaths(self, children):
         """Find the note links in the children of the AST tree.
         Return the set of paths for the notes linked to.
         """
@@ -448,30 +439,28 @@ class Note:
                 if child.get("element") == "note_link":
                     result.add(child["ref"])
                 try:
-                    result.update(self.parse_linkpaths(child["children"]))
+                    result.update(self.find_linkpaths(child["children"]))
                 except KeyError:
                     pass
         return result
 
     def add_hashtags(self):
         "Add the hashtags in this note to the lookup."
-        path = self.path
-        for word in self.parse_hashtags(self.ast["children"]):
-            HASHTAGS.setdefault(word, set()).add(path)
+        for word in self.find_hashtags(self.ast["children"]):
+            HASHTAGS.setdefault(word, set()).add(self)
 
     def remove_hashtags(self):
         "Remove the hashtags in this note from the lookup."
-        path = self.path
-        for word in self.parse_hashtags(self.ast["children"]):
+        for word in self.find_hashtags(self.ast["children"]):
             try:
-                HASHTAGS[word].remove(path)
+                HASHTAGS[word].remove(self)
             except KeyError:
                 pass
             else:
                 if not HASHTAGS[word]:
                     HASHTAGS.pop(word)
 
-    def parse_hashtags(self, children):
+    def find_hashtags(self, children):
         """Find the hashtags in the children of the AST tree.
         Return the set of words.
         """
@@ -481,7 +470,7 @@ class Note:
                 if child.get("element") == "hash_tag":
                     result.add(child["word"])
                 try:
-                    result.update(self.parse_hashtags(child["children"]))
+                    result.update(self.find_hashtags(child["children"]))
                 except KeyError:
                     pass
         return result
@@ -523,14 +512,6 @@ class Note:
                 linking.update(BACKLINKS[note.path])
             except KeyError:
                 pass
-        linking = [get_note(path) for path in linking]
-        # Remove all backlinks and hashtags while old paths.
-        for note in changing:
-            note.remove_backlinks()
-            note.remove_hashtags()
-        for note in linking:
-            note.remove_backlinks()
-            note.remove_hashtags()
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -558,10 +539,9 @@ class Note:
         # Move the attached file if there is one.
         if self.file_extension:
             os.rename(old_abspathfile, self.abspathfile)
-        # Convert the old supernote to file, if no other subnotes in it.
+        # Convert the old supernote to file, if no subnotes left in it.
         if len(old_supernote.subnotes) == 0:
-            old_supernote_fileabspath = old_supernote.abspath + ".md"
-            with open(old_fileabspath, "w") as outfile:
+            with open(old_supernote.abspath + ".md", "w") as outfile:
                 outfile.write(old_supernote.text)
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
@@ -572,13 +552,8 @@ class Note:
             note._text = text   # Do not add backlinks just yet.
             note._ast = None    # Force recompile.
             note.write(update_modified=False)
-        # Add back backlinks and hashtags with new the paths.
-        for note in changing:
-            note.add_backlinks()
-            note.add_hashtags()
-        for note in linking:
-            note.add_backlinks()
-            note.add_hashtags()
+        # Force the modified timestamp of the file to now.
+        self.set_modified()
         # Add this note to recently changed.
         self.put_recent()
 
@@ -618,10 +593,9 @@ class Note:
     def check_synced_filesystem(self):
         "When DEBUG: Check that this note is synced with its storage on disk."
         if not flask.current_app.config["DEBUG"]: return
-        flask.current_app.logger.debug(f"check_synced_filesystem '{self}'")
-        if self.subnotes:
+        if self.subnotes or self is ROOT:
             if not os.path.isdir(self.abspath):
-                raise ValueError(f"'{self}' contains subnotes but is not a directory")
+                raise CheckError(f"'{self}' contains subnotes but is not a directory")
             try:
                 with open(os.path.join(self.abspath, "__text__.md")) as infile:
                     text = infile.read()
@@ -630,11 +604,11 @@ class Note:
         else:
             abspath = self.abspath + ".md"
             if not os.path.isfile(abspath):
-                raise ValueError(f"{self} has no subnotes but is not a file")
+                raise CheckError(f"{self} has no subnotes but is not a file")
             with open(abspath) as infile:
                 text = infile.read()
         if text != self.text:
-            raise ValueError(f"'{self}' text differs from file")
+            raise CheckError(f"'{self}' text differs from file")
 
 
 class Timer:
@@ -761,23 +735,24 @@ def check_recent_ordered():
     "When DEBUG: If RECENT is not ordered, print it and raise ValueError."
     if not flask.current_app.config["DEBUG"]: return
     flask.current_app.logger.debug("checked_recent_ordered")
+    if not RECENT: return
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
             content = "\n".join([f"{localtime(n.modified)}  {n}" for n in RECENT])
-            raise ValueError(f"RECENT out of order:\n{content}")
+            raise CheckError(f"RECENT out of order:\n{content}")
 
 def check_synced_filesystem():
     "When DEBUG: Check that all notes in memory exist as files/directories."
     if not flask.current_app.config["DEBUG"]: return
-    flask.current_app.logger.debug("checked_synced_filesystem for all notes")
+    flask.current_app.logger.debug("checked_synced_filesystem")
     for note in ROOT.traverse():
         note.check_synced_filesystem()
 
 def check_synced_memory():
     "When DEBUG: Check that files/directories exist as notes in memory."
     if not flask.current_app.config["DEBUG"]: return
-    flask.current_app.logger.debug("checked_synced_memory for all notes")
+    flask.current_app.logger.debug("checked_synced_memory")
     root = flask.current_app.config["NOTEBOOK_DIRPATH"]
     try:
         abspath = os.path.join(root, "__text__.md")
@@ -786,7 +761,7 @@ def check_synced_memory():
     except OSError:
         text = ""
     if text != ROOT.text:
-        raise ValueError(f"file {abspath} text differs from ROOT")
+        raise CheckError(f"file {abspath} text differs from ROOT")
     for dirpath, dirnames, filenames in os.walk(root):
         for dirname in dirnames:
             abspath = os.path.join(dirpath, dirname)
@@ -794,9 +769,9 @@ def check_synced_memory():
             try:
                 note = get_note(path)
             except KeyError:
-                raise ValueError(f"No note for directory {abspath}")
+                raise CheckError(f"No note for directory {abspath}")
             if not note.subnotes:
-                raise ValueError(f"Directory {abspath} note has no subnotes")
+                raise CheckError(f"Directory {abspath} note has no subnotes")
             try:
                 textabspath = os.path.join(abspath, "__text__.md")
                 with open(textabspath) as infile:
@@ -804,7 +779,7 @@ def check_synced_memory():
             except OSError:
                 text = ""
             if text != note.text:
-                raise ValueError(f"file {textabspath} text differs from '{note}'")
+                raise CheckError(f"file {textabspath} text differs from '{note}'")
                 
         for filename in filenames:
             abspath = os.path.join(dirpath, filename)
@@ -815,36 +790,29 @@ def check_synced_memory():
                 try:
                     note = get_note(path)
                 except KeyError:
-                    raise ValueError(f"No note for file {abspath}")
+                    raise CheckError(f"No note for file {abspath}")
                 with open(abspath) as infile:
                     text = infile.read()
                 if text != note.text:
-                    raise ValueError(f"file {abspath} text differs from '{note}'")
+                    raise CheckError(f"file {abspath} text differs from '{note}'")
             else:
                 try:
                     note = get_note(path)
                 except KeyError:
-                    raise ValueError(f"No note '{path}' for non-md file {abspath}")
+                    raise CheckError(f"No note '{path}' for non-md file {abspath}")
                 if ext != note.file_extension:
-                    raise ValueError(f"Non-md file {abspath} extension"
+                    raise CheckError(f"Non-md file {abspath} extension"
                                      f" does not match '{note}'")
                 if os.path.getsize(abspath) != note.file_size:
-                    raise ValueError(f"Non-md file {abspath} size"
+                    raise CheckError(f"Non-md file {abspath} size"
                                      f" does not match '{note}'")
 
-def check_backlinks():
-    "Check that paths in backlinks refer to existing notes."
+def print_backlinks(label=None):
+    b = {}
     for source, targets in BACKLINKS.items():
-        try:
-            get_note(source)
-        except KeyError:
-            raise ValueError(f"backlink source '{source}' does not resolve")
-        for target in targets:
-            try:
-                get_note(target)
-            except KeyError:
-                raise ValueError(f"backlink target '{target}' does not resolve")
-
+        b[str(source)] = [str(t) for t in targets]
+    if label: print("====", label)
+    print(json.dumps(b, indent=2))
 
 app = flask.Flask(__name__)
 
@@ -894,7 +862,7 @@ def setup():
     check_recent_ordered()
     check_synced_filesystem()
     check_synced_memory()
-    check_backlinks()
+    print_backlinks("setup")
     flash_message(f"Setup {timer}")
 
 @app.context_processor
@@ -980,7 +948,6 @@ def create():
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()
-        check_backlinks()
         return flask.redirect(note.url)
 
 @app.route("/note/<path:path>")
@@ -1051,7 +1018,6 @@ def edit(path=""):
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()
-        check_backlinks()
         return flask.redirect(note.url)
 
 @app.route("/move/<path:path>", methods=["GET", "POST"])
@@ -1086,7 +1052,6 @@ def move(path):
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()
-        check_backlinks()
         return flask.redirect(note.url)
 
 @app.route("/delete/<path:path>", methods=["POST"])
@@ -1105,7 +1070,6 @@ def delete(path):
     check_recent_ordered()
     check_synced_filesystem()
     check_synced_memory()
-    check_backlinks()
     return flask.redirect(note.supernote.url)
 
 @app.route("/star/<path:path>", methods=["POST"])

@@ -1,29 +1,26 @@
 {# List of sibling notes. #}
 {% if note.supernote %}
 <div class="card my-3">
-  <div class="card-header bg-info py-1">Sibling notes</div>
-  <div class="card-body small py-1">
-    <table width="100%">
-      {% for sibling in note.supernote.subnotes %}
-      <tr>
-        <td class="py-0">
-          {% if sibling == note %}
-          <span class="text-muted">{{ sibling.title }}</span>
-          {% else %}
-          <a href="{{ sibling.url }}" class="text-decoration-none">
-            {{ sibling.title }}</a>
-          {% endif %}
-        </td>
-        <td class="text-end py-0">
-          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
-                  data-clipboard-text="[[{{ sibling.path }}]]"
-                  title="Copy the path of the note to the clipboard.">
-            <span class="bi-clipboard text-dark"></span>
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+  <div class="card-header bg-secondary text-white py-1">Sibling notes</div>
+  <div class="card-body small p-1">
+    {% for sibling in note.supernote.subnotes %}
+    <div class="d-flex align-items-start">
+      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-1"
+              data-clipboard-text="[[{{ sibling.path }}]]"
+              title="Copy the path of the note to the clipboard.">
+        <span class="bi-clipboard text-dark"></span>
+      </button>
+      {% if sibling.starred %}
+      <span class="bi-star-fill text-warning me-1"></span>
+      {% endif %}
+      {% if sibling == note %}
+      <span class="text-muted">{{ sibling.title }}</span>
+      {% else %}
+      <a href="{{ sibling.url }}" class="text-decoration-none">
+        {{ sibling.title }}</a>
+      {% endif %}
+    </div>
+    {% endfor %}
   </div>
 </div>
 {% endif %} {# if note.supernote #}

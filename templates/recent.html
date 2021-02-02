@@ -1,23 +1,20 @@
 {# Most recently modified notes #}
 <div class="card mb-3">
-  <div class="card-header bg-secondary text-light py-1">Recently changed</div>
-  <div class="card-body small py-1">
-    <table width="100%">
-      {% for note in get_recent() %}
-      <tr>
-        <td class="py-0">
-          <a href="{{ note.url }}" class="text-decoration-none">
-            {{ note.title }}</a>
-        </td>
-        <td class="text-end py-0">
-          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
-                  data-clipboard-text="[[{{ note.path }}]]"
-                  title="Copy the path of the note to the clipboard.">
-            <span class="bi-clipboard text-dark"></span>
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+  <div class="card-header bg-info text-light py-1">Recently changed</div>
+  <div class="card-body small p-1">
+    {% for note in get_recent() %}
+    <div class="d-flex align-items-start">
+      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-1"
+              data-clipboard-text="[[{{ note.path }}]]"
+              title="Copy the path of the note to the clipboard.">
+        <span class="bi-clipboard text-dark"></span>
+      </button>
+      {% if note.starred %}
+      <span class="bi-star-fill text-warning me-1"></span>
+      {% endif %}
+      <a href="{{ note.url }}" class="text-decoration-none">
+        {{ note.title }}</a>
+    </div>
+    {% endfor %}
   </div>
 </div>

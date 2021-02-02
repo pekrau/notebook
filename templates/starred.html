@@ -4,30 +4,20 @@
   <div class="card-header bg-warning py-1">
     <span class="bi-star-fill"></span> Starred
   </div>
-  <div class="card-body small py-1">
-    <table width="100%">
-      {% for note in starred %}
-      <tr>
-        <td class="py-0">
-          <a href="{{ note.url }}" class="text-decoration-none">
-            {{ note.title }}</a>
-        </td>
-        <td class="text-end py-0">
-          <button class="btn btn-clipboard btn-sm btn-outline-none p-0"
-                  data-clipboard-text="[[{{ note.path }}]]"
-                  title="Copy the path of the note to the clipboard.">
-            <span class="bi-clipboard text-dark"></span>
-          </button>
-        </td>
-      </tr>
-      {% endfor %}
-      {% if not starred %}
-      <tr>
-        <td colspan="2">
-          <i>none</i>
-        </td>
-      </tr>
-      {% endif %}
-    </table>
+  <div class="card-body small p-1">
+    {% for note in starred %}
+    <div class="d-flex align-items-start">
+      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-1"
+              data-clipboard-text="[[{{ note.path }}]]"
+              title="Copy the path of the note to the clipboard.">
+        <span class="bi-clipboard text-dark"></span>
+      </button>
+      <a href="{{ note.url }}" class="text-decoration-none">
+        {{ note.title }}</a>
+    </div>
+    {% endfor %}
+    {% if not starred %}
+    <i class="mx-2">none</i>
+    {% endif %}
   </div>
 </div>

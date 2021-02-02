@@ -1,60 +1,29 @@
 {% macro noteslist(notes, level) %}
 {% if notes and level > 0 %}
-<div class="card">
-  <div class="card-header">Subnotes</div>
-  <div class="card-body">
-    <table width="100%">
-      <tbody>
-    {% for note in notes %}
-        <tr class="align-top">
-          <td width="5%" class="pe-3">
-            {% if note.text or note.subnotes %}
-            {% if level == 1 %}
-            <button type="button" disabled
-                    class="btn btn-sm btn-outline-secondary py-0">
-              <span class="bi-three-dots"></span>
-            </button>
-            {% else %}
-            <button type="button"
-                    class="btn btn-sm btn-outline-primary py-0"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#{{ note.idpath }}"
-                    aria-expanded="false" aria-controls="{{ note.idpath }}">
-              <span class="bi-caret-down"></span>
-            </button>
-            {% endif %}
-            {% else %}
-            <button type="button" disabled
-                    class="btn btn-sm btn-outline-secondary py-0">
-              <span class="bi-circle"></span>
-            </button>
-            {% endif %}
-          </td>
-          <td class="text-start">
-            <a href="{{ note.url }}" class="text-decoration-none">
-              {{ note.title }}</a>
-          </td>
-          <td class="text-end">
-            {% if note.subnotes %}
-            <span class="badge bg-secondary">{{ note.count }}</span>
-            {% endif %}
-          </td>
-        </tr>
-        <tr class="collapse" id="{{ note.idpath }}">
-          <td></td>
-          <td colspan="2">
-            {{ note.text | markdown }}
-            {% if note.subnotes %}
-            <div>
-              {{ noteslist(note.subnotes, level-1) }}
-            </div>
-            {% endif %}
-          </td>
-        </tr>
-  {% endfor %} {# for note in notes #}
-      </tbody>
-    </table>
-  </div>
-</div>
+<ul class="list-unstyled">
+  {% for note in notes %}
+  <li class="my-1">
+    <div class="d-flex justify-content-start">
+      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-1"
+              data-clipboard-text="[[{{ note.path }}]]"
+              title="Copy the path of the note to the clipboard.">
+        <span class="bi-clipboard text-dark"></span>
+      </button>
+      {% if note.starred %}
+      <span class="bi-star-fill text-warning me-1"></span>
+      {% endif %}
+      <a href="{{ note.url }}" class="text-decoration-none">{{ note.title }}</a>
+      {% if note.subnotes and level == 1 %}
+      <span class="badge bg-secondary ms-2">{{ note.count }}</span>
+      {% endif %}
+    </div>
+    {% if note.subnotes %}
+    <div class="ps-5">
+      {{ noteslist(note.subnotes, level-1) }}
+    </div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
 {% endif %}
 {% endmacro %}
