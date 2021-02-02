@@ -26,51 +26,42 @@
 {{ note.title }}
 {% endblock %}
 
-{% block navbar %}
-{% if interactive %}
-<a href="{{ url_for('edit', path=note.path) }}"
-   class="btn btn-primary px-5 mx-md-5">Edit</a>
-<form action="{{ url_for('create') }}"
-      class="mx-md-2 my-md-0"
-      method="GET">
-  {% if note.path %}
-  <input type="hidden" name="supernote" value="{{ note.path }}">
-  {% endif %}
-  <button type="submit" class="btn btn-outline-primary"
-          title="Create a subnote for this note.">Subnote</button>
-</form>
-<form action="{{ url_for('create') }}"
-      class="mx-md-2 my-md-0"
-      method="GET">
-  {% if note.path %}
-  <input type="hidden" name="supernote" value="{{ note.path }}">
-  {% endif %}
-  <input type="hidden" name="upload" value="true">
-  <button type="submit" class="btn btn-outline-primary"
-          title="Upload a file as a subnote for this note.">Upload</button>
-</form>
-<a href="{{ url_for('move', path=note.path) }}"
-   class="btn btn-outline-primary mx-md-2">Move</a>
-<form action="{{ url_for('create') }}"
-      class="mx-md-2 my-md-0"
-      method="GET">
-  {% if note.supernote %}
-  <input type="hidden" name="supernote" value="{{ note.supernote.path }}">
-  {% endif %}
-  <input type="hidden" name="source" value="{{ note.path }}">
-  <button type="submit" class="btn btn-outline-primary"
-          title="Create a copy of this note.">Copy</button>
-</form>
-<form action="{{ url_for('delete', path=note.path) }}"
-      class="mx-md-2 my-md-0"
-      method="POST">
-  <button role="submit" class="btn btn-sm btn-outline-danger"
-          {{ not note.is_deletable() and 'disabled' or '' }}
-          onclick="return confirm('Really delete recursively? Cannot be undone.')"
-          >Delete</button>
-</form>
-{% endif %} {# if interactive #}
-{% endblock %} {# block navbar #}
+{% block navmenu %}
+<li class="nav-item dropdown">
+  <a href="#" id="actionsDropdown"
+     role="button" data-bs-toggle="dropdown"
+     class="nav-link dropdown-toggle active me-3"
+     aria-expanded="false">Actions</a>
+  <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
+    <li>
+      <a href="{{ url_for('edit', path=note.path) }}"
+         class="dropdown-item"
+         title="Edit this note.">Edit</a>
+    </li>
+    <li>
+      <a href="{{ url_for('create', supernote=note.path) }}"
+         class="dropdown-item"
+         title="Create a subnote for this note.">Create subnote</a>
+    </li>
+    <li>
+      <a href="{{ url_for('create', supernote=note.path, upload=True) }}"
+         class="dropdown-item"
+         title="Upload a file into a new subnote for this note.">
+        Upload file</a>
+    </li>
+    <li>
+      <a href="{{ url_for('move', path=note.path) }}"
+         class="dropdown-item"
+         title="Move this note to another supernote.">Move</a>
+    </li>
+    <li>
+      <a href="{{ url_for('create', supernote=note.supernote.path, source=note.path) }}"
+         class="dropdown-item"
+         title="Create a copy of this note.">Copy</a>
+    </li>
+  </ul>
+</li>
+{% endblock %} {# block navmenu #}
 
 {% block meta %}
 <small>{{ note.modified | localtime }}</small>
@@ -112,10 +103,18 @@
 {% endblock %} {# block main #}
 
 {% block right %}
-{% if interactive %}
+<a href="{{ url_for('edit', path=note.path) }}"
+   class="btn btn-primary d-grid mb-3">Edit</a>
+<form action="{{ url_for('delete', path=note.path) }}"
+      class="d-grid mb-3"
+      method="POST">
+  <button role="submit" class="btn btn-sm btn-outline-danger"
+          {{ not note.is_deletable() and 'disabled' or '' }}
+          onclick="return confirm('Really delete recursively? Cannot be undone.')"
+          >Delete</button>
+</form>
 {% include 'starred.html' %}
 {% include 'recent.html' %}
-{% endif %} {# if interactive #}
 {% endblock %}
 
 {% block javascript %}

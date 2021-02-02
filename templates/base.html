@@ -15,24 +15,26 @@
   <body>
     <nav class="navbar navbar-expand-md navbar-light bg-light">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('home') }}"
+        <a class="navbar-brand text-muted" href="{{ url_for('home') }}"
            title="{{ config['NOTEBOOK_DIRPATH'] }}">
           <img src="{{ url_for('static', filename='icon.png') }}"
 	       width="32" height="32" class="d-inline-block align-top">
           {{ g.config['NOTEBOOK_TITLE'] }}
         </a>
         <button type="button" class="navbar-toggler"
-                data-bs-toggle="collapse" data-bs-target="#top_navbar"
-                aria-controls="top_navbar" aria-expanded="false"
+                data-bs-toggle="collapse" data-bs-target="#navbar"
+                aria-controls="navbar" aria-expanded="false"
                 aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="collapse navbar-collapse" id="top_navbar">
+        <div class="collapse navbar-collapse" id="navbar">
           <ul class="navbar-nav me-auto">
+            {% block navmenu %}
+            {% endblock %}
             <li class="nav-item dropdown">
               <a href="#" id="hashtagsDropdown"
                  role="button" data-bs-toggle="dropdown"
-                 class="nav-link dropdown-toggle"
+                 class="nav-link dropdown-toggle me-3"
                  aria-expanded="false">Hashtags</a>
               <ul class="dropdown-menu" aria-labelledby="hashtagsDropdown">
                 {% for word in get_hashtags() %}
@@ -43,8 +45,6 @@
                 {% endfor %}
               </ul>
             </li>
-            {% block navmenu %}
-            {% endblock %}
           </ul>
           {% block navbar %}
           {% endblock %}

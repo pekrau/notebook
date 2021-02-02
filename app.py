@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 import collections
 import json
@@ -1085,8 +1085,9 @@ def star(path):
 
 @app.route("/hashtag/<word>")
 def hashtag(word):
-    notes = [get_note(p) for p in HASHTAGS.get(word, [])]
-    return flask.render_template("hashtag.html", word=word, notes=notes)
+    return flask.render_template("hashtag.html",
+                                 word=word,
+                                 notes=sorted(HASHTAGS.get(word, [])))
 
 @app.route("/search")
 def search():

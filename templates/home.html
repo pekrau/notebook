@@ -7,23 +7,29 @@
 {{ g.config['NOTEBOOK_TITLE'] }}
 {% endblock %}
 
-{% block navbar %}
-{% if interactive %}
-<a href="{{ url_for('edit', path='') }}"
-   class="btn btn-outline-primary px-5 mx-md-2">Edit</a>
-<form action="{{ url_for('create') }}" class="mx-md-2"
-      method="GET">
-  <button type="submit" class="btn btn-outline-primary"
-          title="Create a note.">Create</button>
-</form>
-<form action="{{ url_for('create') }}"
-      class="mx-md-2 my-md-0"
-      method="GET">
-  <input type="hidden" name="upload" value="true">
-  <button type="submit" class="btn btn-outline-primary"
-          title="Upload a file as a note.">Upload</button>
-</form>
-{% endif %} {# if interactive #}
+{% block navmenu %}
+<li class="nav-item dropdown">
+  <a href="#" id="actionsDropdown"
+     role="button" data-bs-toggle="dropdown"
+     class="nav-link dropdown-toggle active me-3"
+     aria-expanded="false">Actions</a>
+  <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
+    <li>
+      <a href="{{ url_for('edit', path='') }}"
+         class="dropdown-item">Edit</a>
+    </li>
+    <li>
+      <a href="{{ url_for('create') }}"
+         class="dropdown-item"
+         title="Create a new note.">Create note</a>
+    </li>
+    <li>
+      <a href="{{ url_for('create', upload=True) }}"
+         class="dropdown-item"
+         title="Upload a file into a new note.">Upload file</a>
+    </li>
+  </ul>
+</li>
 {% endblock %} {# block navbar #}
 
 {% block meta %}
@@ -76,10 +82,10 @@
 {% endblock %} {# block main #}
 
 {% block right %}
-{% if interactive %}
+<a href="{{ url_for('edit', path='') }}"
+   role="button" class="btn btn-primary d-grid mb-3">Edit</a>
 {% include 'starred.html' %}
 {% include 'recent.html' %}
-{% endif %} {# if interactive #}
 {% endblock %} {# block right #}
 
 {% block javascript %}

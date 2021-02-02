@@ -7,11 +7,6 @@
 <small>{{ note.modified | localtime }}</small>
 {% endblock %}
 
-{% block navbar %}
-<a href="{{ url_for('note', path=note['path']) }}"
-   class="btn btn-secondary px-5 mx-5">Cancel</a>
-{% endblock %} {# block navbar #}
-
 {% block left %}
 {% include 'backlinks.html' %}
 {% endblock %} {# block left #}
@@ -79,6 +74,8 @@
 {% endblock %} {# block main #}
 
 {% block right %}
+<a href="{{ url_for('note', path=note['path']) }}"
+   class="btn btn-secondary d-grid mb-3">Cancel</a>
 {% include 'starred.html' %}
 {% include 'recent.html' %}
 {% endblock %} {# block right #}

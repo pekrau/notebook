@@ -2,7 +2,7 @@
 
 {% block head_title %}
 {% if upload %}
-Upload a file
+Upload a file into a new note
 {% else %}
 Create a new note
 {% endif %}
@@ -10,21 +10,11 @@ Create a new note
 
 {% block body_title %}
 {% if upload %}
-Upload a file
+Upload a file into a new note
 {% else %}
 Create a new note
 {% endif %}
 {% endblock %}
-
-{% block navbar %}
-{% if source %}
-<a href="{{ source.url }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
-{% elif supernote %}
-<a href="{{ supernote.url }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
-{% else %}
-<a href="{{ url_for('home') }}" class="btn btn-secondary px-5 mx-5">Cancel</a>
-{% endif %}
-{% endblock %} {# block navbar #}
 
 {% block main %}
 <div class="card">
@@ -91,6 +81,13 @@ Create a new note
 {% endblock %} {# block main #}
 
 {% block right %}
+{% if source %}
+<a href="{{ source.url }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
+{% elif supernote %}
+<a href="{{ supernote.url }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
+{% else %}
+<a href="{{ url_for('home') }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
+{% endif %}
 {% include 'starred.html' %}
 {% include 'recent.html' %}
 {% endblock %} {# block right #}
