@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.1"
+__version__ = "0.9.3"
 
 import collections
 import json
@@ -11,6 +11,11 @@ import flask
 import marko
 import marko.ast_renderer
 import jinja2.utils
+
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = False
 
 
 ROOT = None           # The root note. Created in 'setup'.
@@ -29,6 +34,8 @@ def get_settings():
                     DEBUG = True,
                     JSON_AS_ASCII = False,
                     IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
+                    OCR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"],
+                    OCR_TIMEOUT = 2.0,
                     MAX_RECENT = 12,
                     NOTEBOOKS = [],
                     DEFAULT_NOTEBOOK = "example")
@@ -40,6 +47,9 @@ def get_settings():
     except OSError:
         pass
     settings["SETTINGS_FILEPATH"] = filepath
+    # Set OCR languages according to what pytesseract knows of.
+    if pytesseract:
+        settings["OCR_LANGS"] = pytesseract.get_languages()
     # Add the default notebook if none recorded since before.
     if not settings["NOTEBOOKS"]:
         settings["NOTEBOOKS"].append(os.path.join(dirpath,
@@ -128,8 +138,6 @@ class Note:
                 linking.update(BACKLINKS[note])
             except KeyError:
                 pass
-        print(f"changing title of '{self}' to '{title}';",
-              "linking >>>", linking)
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -345,14 +353,30 @@ class Note:
         with open(filepath, "wb") as outfile:
             outfile.write(content)
         self.file_extension = extension
-        self.file_size = len(content)
 
     def remove_file(self):
         "Remove the attached file, if any."
         if not self.file_extension: return
         os.remove(self.abspathfile)
         self.file_extension = None
-        self.file_size = None
+
+    def get_ocr_text(self, lang):
+        "Perform OCR in the file image, using the languages given."
+        config = flask.current_app.config
+        if not pytesseract:
+            raise ValueError("Module pytesseract has not been installed.")
+        if not self.file_extension:
+            raise ValueError("No file to do OCR on.")
+        if self.file_extension not in config["OCR_EXTENSIONS"]:
+            raise ValueError("Cannot do OCR on the given type of file.")
+        if lang not in config["OCR_LANGS"]:
+            raise ValueError(f"Cannot handle language '{lang}' for OCR.")
+        try:
+            return pytesseract.image_to_string(self.abspathfile,
+                                               lang=lang,
+                                               timeout=config["OCR_TIMEOUT"])
+        except RuntimeError:
+            raise ValueError("pytesseract timeout.")
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -644,10 +668,10 @@ class NoteLinkRendererMixin:
             note = get_note(element.ref)
         except KeyError:
             # Stale link; target does not exist.
-            return f'<span class="text-danger">{element.ref}</span>'
+            return f'<span class="text-danger">[[{element.ref}]]</span>'
         else:
             # Proper link to target.
-            return f'<a class="fw-bold text-decoration-none" href="{note.url}">{note.title}</a>'
+            return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
 
 class NoteLinkExt:
     elements = [NoteLink]
@@ -732,7 +756,7 @@ def get_recent(): return list(RECENT)
 def get_hashtags(): return sorted(HASHTAGS.keys())
 
 def check_recent_ordered():
-    "When DEBUG: If RECENT is not ordered, print it and raise ValueError."
+    "When DEBUG: Check that RECENT is ordered."
     if not flask.current_app.config["DEBUG"]: return
     flask.current_app.logger.debug("checked_recent_ordered")
     if not RECENT: return
@@ -803,16 +827,6 @@ def check_synced_memory():
                 if ext != note.file_extension:
                     raise CheckError(f"Non-md file {abspath} extension"
                                      f" does not match '{note}'")
-                if os.path.getsize(abspath) != note.file_size:
-                    raise CheckError(f"Non-md file {abspath} size"
-                                     f" does not match '{note}'")
-
-def print_backlinks(label=None):
-    b = {}
-    for source, targets in BACKLINKS.items():
-        b[str(source)] = [str(t) for t in targets]
-    if label: print("====", label)
-    print(json.dumps(b, indent=2))
 
 app = flask.Flask(__name__)
 
@@ -862,7 +876,6 @@ def setup():
     check_recent_ordered()
     check_synced_filesystem()
     check_synced_memory()
-    print_backlinks("setup")
     flash_message(f"Setup {timer}")
 
 @app.context_processor
@@ -913,7 +926,8 @@ def create():
         return flask.render_template("create.html",
                                      supernote=supernote,
                                      source=source,
-                                     upload=flask.request.values.get("upload"))
+                                     upload=flask.request.values.get("upload"),
+                                     ocr=bool(pytesseract))
 
     elif flask.request.method == "POST":
         try:
@@ -942,6 +956,13 @@ def create():
             note = supernote.create_subnote(title, text)
             if upload:
                 note.upload_file(upload.read(), extension)
+                lang = flask.request.form.get("ocr_lang")
+                if lang:
+                    text = note.get_ocr_text(lang).strip()
+                    if note.text:
+                        note.text = note.text + "\n\n" + text
+                    else:
+                        note.text = text
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
