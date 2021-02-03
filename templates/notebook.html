@@ -6,8 +6,9 @@
 {% block main %}
 <div class="card">
   <div class="card-body py-0">
-    <form action="{{ url_for('add_notebook') }}"
+    <form action="{{ url_for('notebook') }}"
           method="POST">
+      {{ get_csrf_token() }}
       <div class="mb-3">
         <label for="notebook" class="col-form-label">Directory path</label>
         <input type="text" name="notebook" id="notebook"

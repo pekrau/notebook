@@ -17,6 +17,7 @@
     <form action="{{ url_for('edit', path=note['path']) }}"
           enctype="multipart/form-data"
           method="POST">
+      {{ get_csrf_token() }}
       {% if note.supernote %}
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>

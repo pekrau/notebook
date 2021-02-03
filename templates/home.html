@@ -59,16 +59,25 @@
     </li>
     {% else %}
     <li class="list-group-item">
-      <a href="{{ url_for('notebook', title=title) }}"
+      <a href="{{ url_for('switch_notebook', title=title) }}"
          title="{{ path }}" class="text-decoration-none">{{ title }}</a>
     </li>
     {% endif %}
     {% endfor %}
   </ul>
 </div>
-<a href="{{ url_for('add_notebook') }}"
+<a href="{{ url_for('notebook') }}"
    class="btn btn-outline-dark d-grid"
-   title="Add an existing directory as notebook.">Add notebook</a>
+   title="Add an existing directory as notebook.">Add new notebook</a>
+<form action="{{ url_for('notebook') }}"
+      method="POST">
+  {{ get_csrf_token() }}
+  <input type="hidden" name="_http_method" value="DELETE">
+  <div class="d-grid mt-3">
+    <button type="submit" class="btn btn-outline-danger small">
+      Remove this notebook</button>
+  </div>
+</form>  
 {% endblock %} {# block left #}
 
 {% block main %}

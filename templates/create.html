@@ -22,6 +22,7 @@ Create a new note
     <form action="{{ url_for('create') }}"
           enctype="multipart/form-data"
           method="POST">
+      {{ get_csrf_token() }}
       <div class="mb-3">
         <label for="supernote" class="col-form-label">Supernote</label>
         {% if supernote %}

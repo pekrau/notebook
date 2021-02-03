@@ -1,11 +1,12 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 
 import collections
 import json
 import os
 import time
+import uuid
 
 import flask
 import marko
@@ -828,6 +829,34 @@ def check_synced_memory():
                     raise CheckError(f"Non-md file {abspath} extension"
                                      f" does not match '{note}'")
 
+def get_csrf_token():
+    "Output HTML for cross-site request forgery (CSRF) protection."
+    # Generate a token to last the session's lifetime.
+    if '_csrf_token' not in flask.session:
+        flask.session['_csrf_token'] = uuid.uuid4().hex
+    html = '<input type="hidden" name="_csrf_token" value="%s">' % \
+           flask.session['_csrf_token']
+    return jinja2.utils.Markup(html)
+
+def check_csrf_token():
+    "Check the CSRF token for POST HTML."
+    # Do not use up the token; keep it for the session's lifetime.
+    token = flask.session.get('_csrf_token', None)
+    if not token or token != flask.request.form.get('_csrf_token'):
+        flask.abort(http.client.BAD_REQUEST)
+
+def get_http_method():
+    "Return the HTTP request method, taking tunneling into account."
+    method = flask.request.method
+    if method == "POST":
+        check_csrf_token()
+        try:
+            method = flask.request.form["_http_method"]
+        except KeyError:
+            pass
+    return method
+
+
 app = flask.Flask(__name__)
 
 app.add_template_filter(markdown)
@@ -885,6 +914,7 @@ def setup_template_context():
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
+                get_csrf_token=get_csrf_token,
                 get_starred=get_starred,
                 get_recent=get_recent,
                 get_hashtags=get_hashtags)
@@ -914,7 +944,8 @@ def root():
 @app.route("/create", methods=["GET", "POST"])
 def create():
     "Create a new note, optionally with an uploaded file."
-    if flask.request.method == "GET":
+    method = get_http_method()
+    if method == "GET":
         try:
             supernote = get_note(flask.request.values["supernote"])
         except KeyError:
@@ -929,7 +960,7 @@ def create():
                                      upload=flask.request.values.get("upload"),
                                      ocr=bool(pytesseract))
 
-    elif flask.request.method == "POST":
+    elif method == "POST":
         try:
             superpath = flask.request.form["supernote"]
             if not superpath: raise KeyError
@@ -999,7 +1030,7 @@ def file(path):
         return flask.send_file(note.abspathfile, conditional=False)
 
 @app.route("/edit/", methods=["GET", "POST"])
-@app.route("/edit/<path:path>", methods=["GET", "POST"])
+@app.route("/edit/<path:path>", methods=["GET", "POST", "DELETE"])
 def edit(path=""):
     "Edit the given note; title (i.e. file/directory rename) and/or text."
     try:
@@ -1012,10 +1043,11 @@ def edit(path=""):
             return flask.redirect(
                 flask.url_for("note", path=os.path.dirname(path)))
 
-    if flask.request.method == "GET":
+    method = get_http_method()
+    if method == "GET":
         return flask.render_template("edit.html", note=note)
 
-    elif flask.request.method == "POST":
+    elif method == "POST":
         try:
             title = flask.request.form.get("title") or ""
             note.title = title
@@ -1041,6 +1073,23 @@ def edit(path=""):
         check_synced_memory()
         return flask.redirect(note.url)
 
+    elif method == "DELETE":
+        try:
+            note = get_note(path)
+        except KeyError:
+            flash_error(f"No such note: '{path}'")
+            return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+        try:
+            note.delete()
+        except ValueError as error:
+            flash_error(error)
+            return flask.redirect(note.url)
+        check_recent_ordered()
+        check_synced_filesystem()
+        check_synced_memory()
+        return flask.redirect(note.supernote.url)
+
+
 @app.route("/move/<path:path>", methods=["GET", "POST"])
 def move(path):
     "Move the given note to a new supernote."
@@ -1050,13 +1099,14 @@ def move(path):
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
 
-    if flask.request.method == "GET":
+    method = get_http_method()
+    if method == "GET":
         if note is ROOT:
             flash_error("Cannot move root note.")
             return flask.redirect(note.url)
         return flask.render_template("move.html", note=note)
 
-    elif flask.request.method == "POST":
+    elif method == "POST":
         supernote = flask.request.form.get("supernote") or ""
         if supernote.startswith("[["):
             supernote = supernote[2:]
@@ -1074,24 +1124,6 @@ def move(path):
         check_synced_filesystem()
         check_synced_memory()
         return flask.redirect(note.url)
-
-@app.route("/delete/<path:path>", methods=["POST"])
-def delete(path):
-    "Delete the given note."
-    try:
-        note = get_note(path)
-    except KeyError:
-        flash_error(f"No such note: '{path}'")
-        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    try:
-        note.delete()
-    except ValueError as error:
-        flash_error(error)
-        return flask.redirect(note.url)
-    check_recent_ordered()
-    check_synced_filesystem()
-    check_synced_memory()
-    return flask.redirect(note.supernote.url)
 
 @app.route("/star/<path:path>", methods=["POST"])
 def star(path):
@@ -1137,60 +1169,75 @@ def search():
                                  notes=sorted(notes),
                                  terms=flask.request.values.get("terms"))
 
-@app.route("/notebook/<title>")
-def notebook(title=None):
-    "Change to another notebook."
-    for notebook in flask.current_app.config["NOTEBOOKS"]:
-        if not os.path.isdir(notebook): continue
-        if not (os.access(notebook, os.R_OK) and 
-                os.access(notebook, os.W_OK)):
-            flash_error("You may not read and write the directory.")
-            break
-        notebook_title = os.path.basename(notebook)
-        if notebook_title == title:
-            flask.current_app.config["NOTEBOOK_DIRPATH"] = notebook
-            flask.current_app.config["NOTEBOOK_TITLE"] = notebook_title
-            flask.current_app.config["NOTEBOOKS"].remove(notebook)
-            flask.current_app.config["NOTEBOOKS"].insert(0, notebook)
-            write_settings()    # Keep this state for next session.
-            setup()
-            break
-    else:
-        flash_error(f"No such notebook '{title}'.")
-    return flask.redirect(flask.url_for("home"))
+@app.route("/notebook", methods=["GET", "POST", "DELETE"])
+def notebook():
+    "Add a new notebook and switch to it. Or delete the current notebook."
+    method = get_http_method()
 
-@app.route("/notebook", methods=["GET", "POST"])
-def add_notebook():
-    "Add a directory as a notebook. It must exist."
-    if flask.request.method == "GET":
+    if method == "GET":
         return flask.render_template("notebook.html")
 
-    elif flask.request.method == "POST":
+    elif method == "POST":
         try:
-            dirpath = flask.request.form["notebook"]
-        except KeyError:
-            flash_error("No directory path given.")
+            try:
+                dirpath = flask.request.form["notebook"]
+                if not dirpath: raise KeyError
+            except KeyError:
+                raise ValueError("No path given.")
+            dirpath = os.path.expanduser(dirpath)
+            dirpath = os.path.expandvars(dirpath)
+            dirpath = os.path.normpath(dirpath)
+            if not os.path.isabs(dirpath):
+                dirpath = os.path.join(os.path.expanduser("~"), dirpath)
+            # If the notebook exists, no need to do anything.
+            if dirpath in flask.current_app.config["NOTEBOOKS"]:
+                pass
+            # Directory exists; add it as a notebook and go to it.
+            elif os.path.isdir(dirpath):
+                if not (os.access(dirpath, os.R_OK) and 
+                        os.access(dirpath, os.W_OK)):
+                    raise ValueError(f"No read/write access to '{dirpath}'")
+                else:
+                    flask.current_app.config["NOTEBOOKS"].append(dirpath)
+                    write_settings()
+            # The path is a file; not allowed.
+            elif os.path.isfile(dirpath):
+                raise ValueError(f"'{dirpath}' is a file.")
+            # The path  does not exist.
+            else:
+                raise ValueError(f"'{dirpath}' does not exist.")
+        except ValueError as error:
+            flash_error(error)
             return flask.redirect(flask.url_for("home"))
-        dirpath = os.path.expanduser(dirpath)
-        dirpath = os.path.expandvars(dirpath)
-        dirpath = os.path.normpath(dirpath)
-        if not os.path.isabs(dirpath):
-            dirpath = os.path.join(os.path.expanduser("~"), dirpath)
-        title = os.path.basename(dirpath)
-        # If the notebook exists, just go to it.
-        if dirpath in flask.current_app.config["NOTEBOOKS"]:
-            return flask.redirect(flask.url_for("notebook", title=title))
-        # Directory exists; add it as a notebook and go to it.
-        if os.path.isdir(dirpath):
-            flask.current_app.config["NOTEBOOKS"].append(dirpath)
-            write_settings()
-            return flask.redirect(flask.url_for("notebook", title=title))
-        # The path is a non-directory, or does not exist.
-        if os.path.exists(dirpath):
-            flash_error(f"The path '{dirpath}' does not specify a directory.")
-        else:
-            flash_error(f"The directory '{dirpath}' does not exist.")
+        return switch_notebook(dirpath)
+
+    elif method == "DELETE":
+        if len(flask.current_app.config["NOTEBOOKS"]) <= 1:
+            flash_error("Cannot remove last notebook.")
+            return flask.redirect(flask.url_for("home"))
+        flask.current_app.config["NOTEBOOKS"].pop(0)
+        return switch_notebook(flask.current_app.config["NOTEBOOKS"][0])
+
+@app.route("/notebook/<title>")
+def switch_notebook(title):
+    "Change to another notebook. Yes, using GET for this is arguably bad."
+    for notebook in flask.current_app.config["NOTEBOOKS"]:
+        if title == os.path.basename(notebook): break
+    else:
+        flash_error(f"No such notebook '{title}'.")
         return flask.redirect(flask.url_for("home"))
+    return switch_notebook(notebook)
+
+def switch_notebook(notebook):
+    "Switch to the given notebook."
+    # Move to the top of the list.
+    flask.current_app.config["NOTEBOOKS"].remove(notebook)
+    flask.current_app.config["NOTEBOOKS"].insert(0, notebook)
+    flask.current_app.config["NOTEBOOK_DIRPATH"] = notebook
+    flask.current_app.config["NOTEBOOK_TITLE"] = os.path.basename(notebook)
+    write_settings()
+    setup()
+    return flask.redirect(flask.url_for("home"))
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@
   <div class="card-body">
     <form action="{{ url_for('move', path=note.path) }}"
           method="POST">
+      {{ get_csrf_token() }}
       <div class="mb-3">
         <label for="current" class="col-form-label">Current supernote</label>
         <input type="text" name="current" id="current" readonly

@@ -11,6 +11,7 @@
 <form action="{{ url_for('star', path=note.path) }}" 
       class="d-inline-flex align-middle"
       method="POST">
+  {{ get_csrf_token() }}
   {% if note.starred %}
   <button type="submit" class="btn btn-outline-warning"
            title="Unstar this note.">
@@ -105,9 +106,11 @@
 {% block right %}
 <a href="{{ url_for('edit', path=note.path) }}"
    class="btn btn-primary d-grid mb-3">Edit</a>
-<form action="{{ url_for('delete', path=note.path) }}"
+<form action="{{ url_for('edit', path=note.path) }}"
       class="d-grid mb-3"
       method="POST">
+  {{ get_csrf_token() }}
+  <input type="hidden" name="_http_method" value="DELETE">
   <button role="submit" class="btn btn-sm btn-outline-danger"
           {{ not note.is_deletable() and 'disabled' or '' }}
           onclick="return confirm('Really delete recursively? Cannot be undone.')"
