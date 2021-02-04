@@ -27,43 +27,6 @@
 {{ note.title }}
 {% endblock %}
 
-{% block navmenu %}
-<li class="nav-item dropdown">
-  <a href="#" id="actionsDropdown"
-     role="button" data-bs-toggle="dropdown"
-     class="nav-link dropdown-toggle active me-3"
-     aria-expanded="false">Actions</a>
-  <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
-    <li>
-      <a href="{{ url_for('edit', path=note.path) }}"
-         class="dropdown-item"
-         title="Edit this note.">Edit</a>
-    </li>
-    <li>
-      <a href="{{ url_for('create', supernote=note.path) }}"
-         class="dropdown-item"
-         title="Create a subnote for this note.">Create subnote</a>
-    </li>
-    <li>
-      <a href="{{ url_for('create', supernote=note.path, upload=True) }}"
-         class="dropdown-item"
-         title="Upload a file into a new subnote for this note.">
-        Upload file</a>
-    </li>
-    <li>
-      <a href="{{ url_for('move', path=note.path) }}"
-         class="dropdown-item"
-         title="Move this note to another supernote.">Move</a>
-    </li>
-    <li>
-      <a href="{{ url_for('create', supernote=note.supernote.path, source=note.path) }}"
-         class="dropdown-item"
-         title="Create a copy of this note.">Copy</a>
-    </li>
-  </ul>
-</li>
-{% endblock %} {# block navmenu #}
-
 {% block meta %}
 <small>{{ note.modified | localtime }}</small>
 {% endblock %}
@@ -105,9 +68,22 @@
 
 {% block right %}
 <a href="{{ url_for('edit', path=note.path) }}"
-   class="btn btn-primary d-grid mb-3">Edit</a>
+   class="btn btn-primary d-grid mb-3"
+   title="Edit the titel and/or text of this note.">Edit</a>
+<a href="{{ url_for('create', supernote=note.path) }}"
+   class="btn btn-primary btn-sm d-grid mb-1"
+   title="Create a subnote for this note.">Create subnote</a>
+<a href="{{ url_for('create', supernote=note.path, upload=True) }}"
+   class="btn btn-primary btn-sm d-grid mb-1"
+   title="Upload a file into a new subnote for this note.">Upload file</a>
+<a href="{{ url_for('create', supernote=note.supernote.path, source=note.path) }}"
+   class="btn btn-primary btn-sm d-grid mb-1"
+   title="Create a copy of this note.">Create copy</a>
+<a href="{{ url_for('move', path=note.path) }}"
+   class="btn btn-primary btn-sm d-grid mb-1"
+   title="Move this note to another supernote.">Move</a>
 <form action="{{ url_for('edit', path=note.path) }}"
-      class="d-grid mb-3"
+      class="d-grid my-3"
       method="POST">
   {{ get_csrf_token() }}
   <input type="hidden" name="_http_method" value="DELETE">
