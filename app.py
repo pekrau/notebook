@@ -1,10 +1,12 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.4"
+__version__ = "0.9.5"
 
 import collections
 import json
 import os
+import platform
+import string
 import time
 import uuid
 
@@ -38,8 +40,7 @@ def get_settings():
                     OCR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"],
                     OCR_TIMEOUT = 2.0,
                     MAX_RECENT = 12,
-                    NOTEBOOKS = [],
-                    DEFAULT_NOTEBOOK = "example")
+                    NOTEBOOKS = [])
     dirpath = os.path.dirname(__file__)
     filepath = os.path.join(dirpath, "settings.json")
     try:
@@ -48,16 +49,23 @@ def get_settings():
     except OSError:
         pass
     settings["SETTINGS_FILEPATH"] = filepath
+    # Set the bad characters for titles/filenames.
+    if platform.system() == 'Linux':
+        settings["BAD_CHARACTERS"] = "/\\"
+    else:                       # Assume Windows; what about MacOS?
+        settings["BAD_CHARACTERS"] = '<>:"/\\|?*/'
     # Set OCR languages according to what pytesseract knows of.
     if pytesseract:
         settings["OCR_LANGS"] = pytesseract.get_languages()
-    # Add the default notebook if none recorded since before.
-    if not settings["NOTEBOOKS"]:
-        settings["NOTEBOOKS"].append(os.path.join(dirpath,
-                                                  settings["DEFAULT_NOTEBOOK"]))
     # The first notebook is the starting one.
-    settings["NOTEBOOK_DIRPATH"] = settings["NOTEBOOKS"][0]
-    settings["NOTEBOOK_TITLE"] = os.path.basename(settings["NOTEBOOK_DIRPATH"])
+    try:
+        notebook = settings["NOTEBOOKS"][0]
+    except IndexError:          # No notebook at all.
+        settings["NOTEBOOK_DIRPATH"] = None
+        settings["NOTEBOOK_TITLE"] = None
+    else:
+        settings["NOTEBOOK_DIRPATH"] = notebook
+        settings["NOTEBOOK_TITLE"] = os.path.basename(notebook)
     return settings
 
 def write_settings():
@@ -77,17 +85,18 @@ def write_settings():
         json.dump(settings, outfile, indent=2)
 
 
-class CheckError(Exception): pass
-
 class Note:
-    "Note and its subnotes, if any."
+    "Note: title, text, and subnotes if any."
 
     def __init__(self, supernote, title):
         self.supernote = supernote
         if supernote:
             supernote.subnotes.append(self)
         self.subnotes = []
-        self._title = title
+        if title is None:
+            self._title = None
+        else:
+            self._title = cleanup_title(title)
         self._text = ""
         self._ast = None
         self.file_extension = None
@@ -115,10 +124,8 @@ class Note:
         Raise KeyError if there is already a note with that title
         """
         if not self.supernote: return  # Root note has no title to change.
-        title = title.replace("\r", "")
-        title = title.strip()
+        title = cleanup_title(title)
         if not title: raise ValueError
-        if "/" in title: raise ValueError
         if title[0] == ".": raise ValueError
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
@@ -419,7 +426,7 @@ class Note:
             filepath = self.abspath + ".md"
             with open(filepath) as infile:
                 self._text = infile.read()
-                self._ast = None      # Remove the AST cache.
+                self._ast = None      # Force recompile of AST.
         # Both directory (except root) and file note may have
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
@@ -502,9 +509,10 @@ class Note:
 
     def create_subnote(self, title, text):
         "Create and return a subnote."
+        title = cleanup_title(title)
         for subnote in self.subnotes:
             if title == subnote.title:
-                raise ValueError(f"Note already exists: '{title}'")
+                raise ValueError(f"Note already exists: '{subnote.title}'")
         # If this note is a file, then convert it into a directory.
         absfilepath = self.abspath + ".md"
         if os.path.isfile(absfilepath):
@@ -620,7 +628,7 @@ class Note:
         if not flask.current_app.config["DEBUG"]: return
         if self.subnotes or self is ROOT:
             if not os.path.isdir(self.abspath):
-                raise CheckError(f"'{self}' contains subnotes but is not a directory")
+                raise RuntimeError(f"'{self}' contains subnotes but is not a directory")
             try:
                 with open(os.path.join(self.abspath, "__text__.md")) as infile:
                     text = infile.read()
@@ -629,11 +637,11 @@ class Note:
         else:
             abspath = self.abspath + ".md"
             if not os.path.isfile(abspath):
-                raise CheckError(f"{self} has no subnotes but is not a file")
+                raise RuntimeError(f"{self} has no subnotes but is not a file")
             with open(abspath) as infile:
                 text = infile.read()
         if text != self.text:
-            raise CheckError(f"'{self}' text differs from file")
+            raise RuntimeError(f"'{self}' text differs from file")
 
 
 class Timer:
@@ -735,6 +743,22 @@ def flash_warning(msg): flask.flash(str(msg), "warning")
 
 def flash_message(msg): flask.flash(str(msg), "message")
 
+def cleanup_title(title):
+    "Clean up the title; remove or replace bad characters."
+    # Convert bad characters to underscore.
+    # - Remove unprintables.
+    # - Replace with underscore those bad for the OS filesystem.
+    title = [c if c not in flask.current_app.config["BAD_CHARACTERS"]
+             else "_" for c in title]
+    title = [c for c in title if c in string.printable]
+    # Remove or replace some others.
+    title = [c for c in title if c != "\r"] # May come from web form input.
+    title = "".join(title)
+    title = title.replace("\n", " ")  # Title only on one line.
+    title = title.replace(".", "_")   # Avoid confusion with extensions.
+    title = title.lstrip("_")         # Avoid confusion with system files.
+    return title.strip()
+
 def get_note(path):
     "Get the note given its path."
     if not path: return ROOT
@@ -765,7 +789,7 @@ def check_recent_ordered():
     for note in RECENT:
         if note.modified > latest.modified:
             content = "\n".join([f"{localtime(n.modified)}  {n}" for n in RECENT])
-            raise CheckError(f"RECENT out of order:\n{content}")
+            raise RuntimeError(f"RECENT out of order:\n{content}")
 
 def check_synced_filesystem():
     "When DEBUG: Check that all notes in memory exist as files/directories."
@@ -786,7 +810,7 @@ def check_synced_memory():
     except OSError:
         text = ""
     if text != ROOT.text:
-        raise CheckError(f"file {abspath} text differs from ROOT")
+        raise RuntimeError(f"file {abspath} text differs from ROOT")
     for dirpath, dirnames, filenames in os.walk(root):
         for dirname in dirnames:
             abspath = os.path.join(dirpath, dirname)
@@ -794,9 +818,9 @@ def check_synced_memory():
             try:
                 note = get_note(path)
             except KeyError:
-                raise CheckError(f"No note for directory {abspath}")
+                raise RuntimeError(f"No note for directory {abspath}")
             if not note.subnotes:
-                raise CheckError(f"Directory {abspath} note has no subnotes")
+                raise RuntimeError(f"Directory {abspath} note has no subnotes")
             try:
                 textabspath = os.path.join(abspath, "__text__.md")
                 with open(textabspath) as infile:
@@ -804,7 +828,7 @@ def check_synced_memory():
             except OSError:
                 text = ""
             if text != note.text:
-                raise CheckError(f"file {textabspath} text differs from '{note}'")
+                raise RuntimeError(f"file {textabspath} text differs from '{note}'")
                 
         for filename in filenames:
             abspath = os.path.join(dirpath, filename)
@@ -815,19 +839,19 @@ def check_synced_memory():
                 try:
                     note = get_note(path)
                 except KeyError:
-                    raise CheckError(f"No note for file {abspath}")
+                    raise RuntimeError(f"No note for file {abspath}")
                 with open(abspath) as infile:
                     text = infile.read()
                 if text != note.text:
-                    raise CheckError(f"file {abspath} text differs from '{note}'")
+                    raise RuntimeError(f"file {abspath} text differs from '{note}'")
             else:
                 try:
                     note = get_note(path)
                 except KeyError:
-                    raise CheckError(f"No note '{path}' for non-md file {abspath}")
+                    raise RuntimeError(f"No note '{path}' for non-md file {abspath}")
                 if ext != note.file_extension:
-                    raise CheckError(f"Non-md file {abspath} extension"
-                                     f" does not match '{note}'")
+                    raise RuntimeError(f"Non-md file {abspath} extension"
+                                       f" does not match '{note}'")
 
 def get_csrf_token():
     "Output HTML for cross-site request forgery (CSRF) protection."
@@ -882,7 +906,7 @@ def setup():
     # Set up most recently modified notes.
     traverser = ROOT.traverse()
     next(traverser)             # Skip root note.
-    notes = list(traverser)     # XXX simple but not very good.
+    notes = list(traverser)
     notes.sort(key=lambda n: n.modified, reverse=True)
     RECENT = collections.deque(notes[:flask.current_app.config["MAX_RECENT"]],
                                maxlen=flask.current_app.config["MAX_RECENT"])
@@ -977,11 +1001,6 @@ def create():
             title, extension = os.path.splitext(upload.filename)
         else:
             title = flask.request.form.get("title") or "No title"
-        title = title.replace("\n", " ")  # Clean up title.
-        title = title.replace("/", " ")   # Avoid confusion with subnotes.
-        title = title.strip()
-        title = title.replace(".", "_")   # Avoid confusion with extensions.
-        title = title.lstrip("_")         # Avoid confusion with system files.
         text = flask.request.form.get("text") or ""
         try:
             note = supernote.create_subnote(title, text)
