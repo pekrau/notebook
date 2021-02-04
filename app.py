@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.7"
+__version__ = "0.9.8"
 
 import collections
 import json
@@ -24,8 +24,8 @@ except ImportError:
 ROOT = None           # The root note. Created in 'setup'.
 STARRED = set()       # Starred notes.
 RECENT = None         # Deque of recently modified notes. Created in 'setup'.
-BACKLINKS = dict()    # Lookup of target note -> set of source notes.
-HASHTAGS = dict()     # Lookup of word -> set of notes.
+BACKLINKS = dict()    # Map target note -> set of source notes.
+HASHTAGS = dict()     # Map word -> set of notes.
 
 
 def get_settings_filepath():
@@ -102,6 +102,7 @@ class Note:
         self._text = ""
         self._ast = None
         self.file_extension = None
+        self.stale_links = []
 
     def __repr__(self):
         return self.path
@@ -449,7 +450,7 @@ class Note:
             try:
                 note = get_note(link)
             except KeyError:    # Stale link.
-                pass
+                self.stale_links.append(link)
             else:
                 BACKLINKS.setdefault(note, set()).add(self)
 
@@ -459,7 +460,10 @@ class Note:
             try:
                 note = get_note(link)
             except KeyError:    # Stale link.
-                pass
+                try:
+                    self.stale_links.remove(link)
+                except ValueError:
+                    pass
             else:
                 BACKLINKS[note].remove(self)
 
@@ -1092,6 +1096,8 @@ def edit(path=""):
                 note.upload_file(upload.read(),
                                  os.path.splitext(upload.filename)[1])      
         note.put_recent()
+        if note.stale_links:
+            flash_warning("Note text contains stale links.")
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()

@@ -73,7 +73,7 @@
           {% for msg in get_flashed_messages(category_filter=['error']) %}
           <div class="alert alert-danger alert-dismissible fade show"
                role="alert">
-            <strong>Error:</strong> {{ msg }}
+            <strong>Sorry:</strong> {{ msg }}
             <button type="button" aria-label="Close"
                     class="btn-close" data-bs-dismiss="alert"></button>
           </div>
@@ -81,7 +81,7 @@
           {% for msg in get_flashed_messages(category_filter=['warning']) %}
           <div class="alert alert-warning alert-dismissible fade show"
                role="alert">
-            <strong>Warning:</strong> {{ msg }}
+            <strong>Note:</strong> {{ msg }}
             <button type="button" aria-label="Close"
                     class="btn-close" data-bs-dismiss="alert"></button>
           </div>
