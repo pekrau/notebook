@@ -113,7 +113,7 @@
   <input type="hidden" name="_http_method" value="DELETE">
   <button role="submit" class="btn btn-sm btn-outline-danger"
           {{ not note.is_deletable() and 'disabled' or '' }}
-          onclick="return confirm('Really delete recursively? Cannot be undone.')"
+          onclick="return confirm('Really delete? Cannot be undone.')"
           >Delete</button>
 </form>
 {% include 'starred.html' %}

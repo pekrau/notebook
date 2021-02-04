@@ -74,7 +74,9 @@
   {{ get_csrf_token() }}
   <input type="hidden" name="_http_method" value="DELETE">
   <div class="d-grid mt-3">
-    <button type="submit" class="btn btn-outline-danger small">
+    <button type="submit" class="btn btn-outline-danger small"
+            onclick="return confirm('Remove will NOT delete the directory itself.')"
+            >
       Remove this notebook</button>
   </div>
 </form>  

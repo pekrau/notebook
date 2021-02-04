@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 import collections
 import json
@@ -28,6 +28,10 @@ BACKLINKS = dict()    # Lookup of target note -> set of source notes.
 HASHTAGS = dict()     # Lookup of word -> set of notes.
 
 
+def get_settings_filepath():
+    "Get the filepath for the user's settings file."
+    return os.path.join(os.path.expanduser("~/.notebooks"))
+
 def get_settings():
     "Return the settings."
     settings = dict(VERSION = __version__,
@@ -41,8 +45,7 @@ def get_settings():
                     OCR_TIMEOUT = 2.0,
                     MAX_RECENT = 12,
                     NOTEBOOKS = [])
-    dirpath = os.path.dirname(__file__)
-    filepath = os.path.join(dirpath, "settings.json")
+    filepath = get_settings_filepath()
     try:
         with open(filepath) as infile:
             settings.update(json.load(infile))
@@ -51,9 +54,9 @@ def get_settings():
     settings["SETTINGS_FILEPATH"] = filepath
     # Set the bad characters for titles/filenames.
     if platform.system() == 'Linux':
-        settings["BAD_CHARACTERS"] = "/\\"
+        settings["BAD_CHARACTERS"] = "/\\.\n"
     else:                       # Assume Windows; what about MacOS?
-        settings["BAD_CHARACTERS"] = '<>:"/\\|?*/'
+        settings["BAD_CHARACTERS"] = '<>:"/\\|?*/.\n'
     # Set OCR languages according to what pytesseract knows of.
     if pytesseract:
         settings["OCR_LANGS"] = pytesseract.get_languages()
@@ -72,8 +75,7 @@ def write_settings():
     """Write out the settings file with updated information.
     Update only the information that can be changed via the app.
     """
-    dirpath = os.path.dirname(__file__)
-    filepath = os.path.join(dirpath, "settings.json")
+    filepath = get_settings_filepath()
     try:
         with open(filepath) as infile:
             settings = json.load(infile)
@@ -750,12 +752,11 @@ def cleanup_title(title):
     # - Replace with underscore those bad for the OS filesystem.
     title = [c if c not in flask.current_app.config["BAD_CHARACTERS"]
              else "_" for c in title]
+    # Remove unprintable characters.
     title = [c for c in title if c in string.printable]
     # Remove or replace some others.
     title = [c for c in title if c != "\r"] # May come from web form input.
     title = "".join(title)
-    title = title.replace("\n", " ")  # Title only on one line.
-    title = title.replace(".", "_")   # Avoid confusion with extensions.
     title = title.lstrip("_")         # Avoid confusion with system files.
     return title.strip()
 
@@ -900,8 +901,10 @@ def setup():
     STARRED.clear()
     BACKLINKS.clear()
     HASHTAGS.clear()
-    # Read in all notes.
     ROOT = Note(None, None)
+    # Nothing more to do if no notebooks.
+    if not flask.current_app.config["NOTEBOOK_DIRPATH"]: return
+    # Read in all notes.
     ROOT.read()
     # Set up most recently modified notes.
     traverser = ROOT.traverse()
@@ -951,6 +954,8 @@ def prepare():
 @app.route("/")
 def home():
     "Home page; root note of the current notebook."
+    if not flask.current_app.config["NOTEBOOK_DIRPATH"]:
+        return flask.redirect(flask.url_for("notebook"))
     n_links = sum([len(s) for s in BACKLINKS.values()])
     notebooks = [(os.path.basename(n), n) 
                  for n in flask.current_app.config["NOTEBOOKS"]]
@@ -1231,11 +1236,17 @@ def notebook():
         return switch_notebook(dirpath)
 
     elif method == "DELETE":
-        if len(flask.current_app.config["NOTEBOOKS"]) <= 1:
-            flash_error("Cannot remove last notebook.")
-            return flask.redirect(flask.url_for("home"))
         flask.current_app.config["NOTEBOOKS"].pop(0)
-        return switch_notebook(flask.current_app.config["NOTEBOOKS"][0])
+        write_settings()
+        try:
+            notebook = flask.current_app.config["NOTEBOOKS"][0]
+        except IndexError:
+            flask.current_app.config["NOTEBOOK_DIRPATH"] = None
+            flask.current_app.config["NOTEBOOK_TITLE"] = None
+            setup()
+            return flask.redirect(flask.url_for("home"))
+        else:
+            return switch_notebook(notebook)
 
 @app.route("/notebook/<title>")
 def switch_notebook(title):
