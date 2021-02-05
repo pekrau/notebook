@@ -38,5 +38,7 @@
 <span class="bi-image text-dark me-1"></span>
 {% elif note.is_file %}
 <span class="bi-file text-dark me-1"></span>
+{% elif note.is_text %}
+<span class="bi-file-font text-dark me-1"></span>
 {% endif %}
 {% endmacro %}

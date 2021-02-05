@@ -37,10 +37,10 @@ def get_settings():
     settings = dict(VERSION = __version__,
                     SERVER_NAME = "localhost.localdomain:5099",
                     SECRET_KEY = "this is a secret key",
-                    TEMPLATES_AUTO_RELOAD = True,
                     DEBUG = True,
                     JSON_AS_ASCII = False,
                     IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
+                    TEXT_EXTENSIONS = [".pdf", ".docx", ".txt"],
                      # Requires tesseract installed, with appropriate data.
                     OCR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"],
                     # Add the languages for which tesseract data is available.
@@ -69,6 +69,8 @@ def get_settings():
     else:
         settings["NOTEBOOK_DIRPATH"] = notebook
         settings["NOTEBOOK_TITLE"] = os.path.basename(notebook)
+    if settings["DEBUG"]:
+        settings["TEMPLATES_AUTO_RELOAD"] = True
     return settings
 
 def write_settings():
@@ -269,6 +271,11 @@ class Note:
     def is_image(self):
         if not self.is_file: return False
         return self.file_extension in flask.current_app.config['IMAGE_EXTENSIONS']
+
+    @property
+    def is_text(self):
+        if not self.is_file: return False
+        return self.file_extension in flask.current_app.config['TEXT_EXTENSIONS']
 
     @property
     def count(self):

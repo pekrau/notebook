@@ -60,7 +60,7 @@
 {% block main %}
 {{ root.text | markdown }}
 <div class="card">
-  <div class="card-header">Subnotes</div>
+  <div class="card-header">Top level notes</div>
   <div class="card-body">
     {{ macros.noteslist(root.subnotes, 3) }}
   </div>
