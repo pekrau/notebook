@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.8"
+__version__ = "0.9.9"
 
 import collections
 import json
@@ -41,8 +41,11 @@ def get_settings():
                     DEBUG = True,
                     JSON_AS_ASCII = False,
                     IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
+                     # Requires tesseract installed, with appropriate data.
                     OCR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"],
-                    OCR_TIMEOUT = 2.0,
+                    # Add the languages for which tesseract data is available.
+                    OCR_LANGS = [],
+                    OCR_TIMEOUT = 4.0,
                     MAX_RECENT = 12,
                     NOTEBOOKS = [])
     filepath = get_settings_filepath()
@@ -57,9 +60,6 @@ def get_settings():
         settings["BAD_CHARACTERS"] = "/\\.\n"
     else:                       # Assume Windows; what about MacOS?
         settings["BAD_CHARACTERS"] = '<>:"/\\|?*/.\n'
-    # Set OCR languages according to what pytesseract knows of.
-    if pytesseract:
-        settings["OCR_LANGS"] = pytesseract.get_languages()
     # The first notebook is the starting one.
     try:
         notebook = settings["NOTEBOOKS"][0]
@@ -152,7 +152,7 @@ class Note:
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
-        if self.file_extension:
+        if self.is_file:
             old_abspathfile = self.abspathfile
         # Actually change the title of the note; rename the file/directory.
         self._title = title
@@ -163,7 +163,7 @@ class Note:
             abspath = self.abspath + ".md"
             os.rename(old_abspath + ".md", abspath)
         # Rename the attached file if there is one.
-        if self.file_extension:
+        if self.is_file:
             os.rename(old_abspathfile, self.abspathfile)
         # Force the modified timestamp of the file to now.
         self.set_modified()
@@ -245,7 +245,7 @@ class Note:
 
     @property
     def abspathfile(self):
-        if not self.file_extension:
+        if not self.is_file:
             raise ValueError("No file attached to this note.")
         return self.abspath + self.file_extension
 
@@ -257,12 +257,18 @@ class Note:
             return flask.url_for("home")
 
     @property
-    def file(self):
+    def is_file(self):
         return bool(self.file_extension)
 
     @property
     def file_size(self):
+        if not self.is_file: return 0
         return os.path.getsize(self.abspathfile)
+
+    @property
+    def is_image(self):
+        if not self.is_file: return False
+        return self.file_extension.lower() in flask.current_app.config['IMAGE_EXTENSIONS']
 
     @property
     def count(self):
@@ -358,7 +364,7 @@ class Note:
         elif not extension:
             extension = ".bin"
         # Remove any existing attached file; may have different extension
-        if self.file_extension:
+        if self.is_file:
             os.remove(self.abspathfile)
         filepath = os.path.join(self.supernote.abspath, self.title + extension)
         with open(filepath, "wb") as outfile:
@@ -367,7 +373,7 @@ class Note:
 
     def remove_file(self):
         "Remove the attached file, if any."
-        if not self.file_extension: return
+        if not self.is_file: return
         os.remove(self.abspathfile)
         self.file_extension = None
 
@@ -376,10 +382,10 @@ class Note:
         config = flask.current_app.config
         if not pytesseract:
             raise ValueError("Module pytesseract has not been installed.")
-        if not self.file_extension:
+        if not self.is_file:
             raise ValueError("No file to do OCR on.")
-        if self.file_extension not in config["OCR_EXTENSIONS"]:
-            raise ValueError("Cannot do OCR on the given type of file.")
+        if not self.is_image:
+            raise ValueError("The file is not an image; Cannot do OCR on it.")
         if lang not in config["OCR_LANGS"]:
             raise ValueError(f"Cannot handle language '{lang}' for OCR.")
         try:
@@ -554,7 +560,7 @@ class Note:
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
-        if self.file_extension:
+        if self.is_file:
             old_abspathfile = self.abspathfile
         # If the new supernote is a file, then convert it first to a directory.
         super_absfilepath = supernote.abspath + ".md"
@@ -576,7 +582,7 @@ class Note:
             new_abspath = self.abspath + ".md"
             os.rename(old_abspath + ".md", new_abspath)
         # Move the attached file if there is one.
-        if self.file_extension:
+        if self.is_file:
             os.rename(old_abspathfile, self.abspathfile)
         # Convert the old supernote to file, if no subnotes left in it.
         if len(old_supernote.subnotes) == 0:
@@ -615,7 +621,7 @@ class Note:
         self.star(remove=True)
         self.remove_recent()
         os.remove(self.abspath + ".md")
-        if self.file_extension:
+        if self.is_file:
             os.remove(self.abspathfile)
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer. Not root!
@@ -752,16 +758,16 @@ def flash_message(msg): flask.flash(str(msg), "message")
 def cleanup_title(title):
     "Clean up the title; remove or replace bad characters."
     # Convert bad characters to underscore.
-    # - Remove unprintables.
+    # - Remove some particular offensive characters
+    # - Replace some other characters with blanks.
     # - Replace with underscore those bad for the OS filesystem.
     title = [c if c not in flask.current_app.config["BAD_CHARACTERS"]
              else "_" for c in title]
-    # Remove unprintable characters.
-    title = [c for c in title if c in string.printable]
-    # Remove or replace some others.
-    title = [c for c in title if c != "\r"] # May come from web form input.
+    # Remove or replace some particular characters.
+    title = [c for c in title if c not in "\a\b\r"]
+    title = [c if c not in "\t\n" else " " for c in title]
     title = "".join(title)
-    title = title.lstrip("_")         # Avoid confusion with system files.
+    title = title.lstrip("_")         # Avoid confusion with 'notebooks' files.
     return title.strip()
 
 def get_note(path):
@@ -978,6 +984,7 @@ def root():
 def create():
     "Create a new note, optionally with an uploaded file."
     method = get_http_method()
+
     if method == "GET":
         try:
             supernote = get_note(flask.request.values["supernote"])
@@ -990,8 +997,7 @@ def create():
         return flask.render_template("create.html",
                                      supernote=supernote,
                                      source=source,
-                                     upload=flask.request.values.get("upload"),
-                                     ocr=bool(pytesseract))
+                                     upload=flask.request.values.get("upload"))
 
     elif method == "POST":
         try:
@@ -1015,13 +1021,6 @@ def create():
             note = supernote.create_subnote(title, text)
             if upload:
                 note.upload_file(upload.read(), extension)
-                lang = flask.request.form.get("ocr_lang")
-                if lang:
-                    text = note.get_ocr_text(lang).strip()
-                    if note.text:
-                        note.text = note.text + "\n\n" + text
-                    else:
-                        note.text = text
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
@@ -1038,7 +1037,9 @@ def note(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    return flask.render_template("note.html", note=note)
+    return flask.render_template("note.html",
+                                 note=note,
+                                 ocr=pytesseract and note.is_image)
 
 @app.route("/file/<path:path>")
 def file(path):
@@ -1048,7 +1049,7 @@ def file(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    if not note.file_extension:
+    if not note.is_file:
         raise KeyError(f"No file attached to note '{path}'")
     if flask.request.values.get("download"):
         return flask.send_file(note.abspathfile,
@@ -1072,6 +1073,7 @@ def edit(path=""):
                 flask.url_for("note", path=os.path.dirname(path)))
 
     method = get_http_method()
+
     if method == "GET":
         return flask.render_template("edit.html", note=note)
 
@@ -1119,7 +1121,27 @@ def edit(path=""):
         check_synced_memory()
         return flask.redirect(note.supernote.url)
 
-
+@app.route("/ocr/<path:path>", methods=["POST"])
+def ocr(path):
+    "Perform OCR on the image file of the note and add the text."
+    get_http_method()           # Does CSRF check.
+    try:
+        note = get_note(path)
+    except KeyError:
+        flash_error(f"No such note: '{path}'")
+        return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    try:
+        lang = flask.request.form.get("ocr_lang")
+        if not lang: raise ValueError("Unknown language for tesseract.")
+        text = note.get_ocr_text(lang).strip()
+        if note.text:
+            note.text = note.text + "\n\n" + text
+        else:
+            note.text = text
+    except ValueError as error:
+        flash_error(error)
+    return flask.redirect(flask.url_for("note", path=note.path))
+    
 @app.route("/move/<path:path>", methods=["GET", "POST"])
 def move(path):
     "Move the given note to a new supernote."
@@ -1130,6 +1152,7 @@ def move(path):
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
 
     method = get_http_method()
+
     if method == "GET":
         if note is ROOT:
             flash_error("Cannot move root note.")
@@ -1158,6 +1181,7 @@ def move(path):
 @app.route("/star/<path:path>", methods=["POST"])
 def star(path):
     "Toggle the star state of the note for the path."
+    get_http_method()           # Does CSRF check.
     try:
         note = get_note(path)
     except KeyError:

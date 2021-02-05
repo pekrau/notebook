@@ -39,23 +39,23 @@
 
 {% block main %}
 {{ note['text'] | markdown }}
-{% if note.file %}
-{% if note.file_extension.lower() in g.config['IMAGE_EXTENSIONS'] %}
+{% if note.is_image %}
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}"
-       class="border border-secondary">
+       class="img-fluid border border-secondary">
   <button class="btn btn-clipboard btn-outline-none"
           data-clipboard-text="{{ url_for('file', path=note.path, _external=True) }}"
         title="Copy the URL of the image to the clipboard.">
   <span class="bi-clipboard text-dark"></span>
 </button>
 </div>
-{% endif %}
+{% endif %} {# if note.is_image #}
+{% if note.is_file %}
 <a href="{{ url_for('file', path=note.path, download=True) }}"
    class="btn btn-primary my-lg-2">
   Download file {{ note.file_size | filesizeformat }}
 </a>
-{% endif %}
+{% endif %} {# if note.is_file #}
 {% if note.subnotes %}
 <div class="card">
   <div class="card-header">Subnotes</div>
@@ -68,8 +68,15 @@
 
 {% block right %}
 <a href="{{ url_for('edit', path=note.path) }}"
-   class="btn btn-primary d-grid mb-3"
+   role="button" class="btn btn-primary d-grid mb-3"
    title="Edit the titel and/or text of this note.">Edit</a>
+{% if ocr %}
+<div class="d-grid mb-1">
+  <button type="button" class="btn btn-primary"
+          data-bs-toggle="modal"
+          data-bs-target="#ocr_modal">Do OCR</button>
+</div>
+{% endif %} {# if ocr #}
 <a href="{{ url_for('create', supernote=note.path) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
    title="Create a subnote for this note.">Create subnote</a>
@@ -94,6 +101,43 @@
 </form>
 {% include 'starred.html' %}
 {% include 'recent.html' %}
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="ocr_modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('ocr', path=note.path) }}"
+            method="POST">
+        {{ get_csrf_token() }}
+        <div class="modal-header">
+          <h5>OCR</h5>
+          <button type="button" data-bs-dismiss="modal"
+                  class="btn-close" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Extract text from the image by OCR.</p>
+          <div class="form-control">
+            {% for lang in g.config["OCR_LANGS"] %}
+            <div class="form-check form-check-inline">
+              <input type="radio" name="ocr_lang" id="ocr_lang_{{ lang }}"
+                     class="form-check-input" 
+                     value="{{ lang }}">
+              <label class="form-check-label" for="ocr_lang_{{ lang }}">
+                {{ lang }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" data-bs-dismiss="modal"
+                  class="btn btn-secondary" >Close</button>
+          <button role="submit" class="btn btn-primary">Do OCR</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block javascript %}
