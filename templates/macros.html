@@ -9,9 +9,8 @@
               title="Copy the path of the note to the clipboard.">
         <span class="bi-clipboard text-dark"></span>
       </button>
-      {% if note.starred %}
-      <span class="bi-star-fill text-warning me-1"></span>
-      {% endif %}
+      {{ starred(note) }}
+      {{ filetype(note) }}
       <a href="{{ note.url }}" class="text-decoration-none">{{ note.title }}</a>
       {% if note.subnotes and level == 1 %}
       <span class="badge bg-secondary ms-2">{{ note.count }}</span>
@@ -25,5 +24,19 @@
   </li>
   {% endfor %}
 </ul>
+{% endif %}
+{% endmacro %}
+
+{% macro starred(note) %}
+{% if note.starred %}
+<span class="bi-star-fill text-warning me-1"></span>
+{% endif %}
+{% endmacro %}
+
+{% macro filetype(note) %}
+{% if note.is_image %}
+<span class="bi-image text-dark me-1"></span>
+{% elif note.is_file %}
+<span class="bi-file text-dark me-1"></span>
 {% endif %}
 {% endmacro %}

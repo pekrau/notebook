@@ -44,12 +44,12 @@
                  aria-describedby="uploadHelp">
           <div id="uploadHelp" class="form-text">
             File to upload as attachment to note.
-            {% if note.file %}
+            {% if note.is_file %}
             <strong>Note:</strong> Will overwrite the current file!
             {% endif %}
           </div>
         </div>
-        {% if note.file %}
+        {% if note.is_file %}
         <div class="col-md-4 mb-3">
           <label for="removefile" class="form-label"></label>
           <div class="form-check pt-3">

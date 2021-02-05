@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.9"
+__version__ = "0.9.10"
 
 import collections
 import json
@@ -268,7 +268,7 @@ class Note:
     @property
     def is_image(self):
         if not self.is_file: return False
-        return self.file_extension.lower() in flask.current_app.config['IMAGE_EXTENSIONS']
+        return self.file_extension in flask.current_app.config['IMAGE_EXTENSIONS']
 
     @property
     def count(self):
@@ -357,6 +357,7 @@ class Note:
         """
         if self is ROOT:
             raise ValueError("Cannot attach a file to the root note.")
+        extension = extension.lower()
         # Uploading Markdown files would create havoc.
         if extension == ".md":
             raise ValueError("Upload of '.md' files is not allowed.")
@@ -521,10 +522,20 @@ class Note:
 
     def create_subnote(self, title, text):
         "Create and return a subnote."
-        title = cleanup_title(title)
-        for subnote in self.subnotes:
-            if title == subnote.title:
-                raise ValueError(f"Note already exists: '{subnote.title}'")
+        orig_title = cleanup_title(title)
+        count = 1
+        title = orig_title
+        while True:
+            for subnote in self.subnotes:
+                if title == subnote.title:
+                    count += 1
+                    title = f"{orig_title}_{count}"
+                    break
+            else:
+                break
+        if title != orig_title:
+            flash_warning("The title was modified to make it unique"
+                          " among sibling notes.")
         # If this note is a file, then convert it into a directory.
         absfilepath = self.abspath + ".md"
         if os.path.isfile(absfilepath):
@@ -532,7 +543,7 @@ class Note:
             os.rename(absfilepath, os.path.join(self.abspath, "__text__.md"))
         note = Note(self, title)
         self.subnotes.sort()
-        # Set the text of the subnote; this also adds backlinks.
+        # Set the text of the subnote; this also adds any backlinks.
         note.text = text
         note.write()
         note.put_recent()
@@ -982,7 +993,9 @@ def root():
 
 @app.route("/create", methods=["GET", "POST"])
 def create():
-    "Create a new note, optionally with an uploaded file."
+    """Create a new note, optionally with an uploaded file.
+    Also make a copy of an existing note.
+    """
     method = get_http_method()
 
     if method == "GET":
@@ -1138,8 +1151,10 @@ def ocr(path):
             note.text = note.text + "\n\n" + text
         else:
             note.text = text
+        note.put_recent()
     except ValueError as error:
         flash_error(error)
+    check_recent_ordered()
     return flask.redirect(flask.url_for("note", path=note.path))
     
 @app.route("/move/<path:path>", methods=["GET", "POST"])
