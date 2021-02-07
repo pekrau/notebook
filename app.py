@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.10"
+__version__ = "0.9.11"
 
 import collections
 import json
@@ -1265,7 +1265,7 @@ def notebook():
             dirpath = os.path.normpath(dirpath)
             if not os.path.isabs(dirpath):
                 dirpath = os.path.join(os.path.expanduser("~"), dirpath)
-            # If the notebook exists, no need to do anything.
+            # If the notebook already exists, no need to do anything.
             if dirpath in flask.current_app.config["NOTEBOOKS"]:
                 pass
             # Directory exists; add it as a notebook and go to it.
@@ -1279,9 +1279,16 @@ def notebook():
             # The path is a file; not allowed.
             elif os.path.isfile(dirpath):
                 raise ValueError(f"'{dirpath}' is a file.")
-            # The path  does not exist.
+            # The path  does not exist; create it.
             else:
-                raise ValueError(f"'{dirpath}' does not exist.")
+                try:
+                    os.mkdir(dirpath)
+                except OSError as error:
+                    raise ValueError(str(error))
+                flash_message("Added notebook and created"
+                              f" the directory '{dirpath}'")
+                flask.current_app.config["NOTEBOOKS"].append(dirpath)
+                write_settings()
         except ValueError as error:
             flash_error(error)
             return flask.redirect(flask.url_for("home"))
