@@ -8,7 +8,7 @@
     </div>
     {% for supernote in note.supernotes()[1:] %}
     <div class="d-flex align-items-start mb-1">
-      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-2"
+      <button class="btn btn-sm btn-outline-none p-0 mx-2 clipboard"
               data-clipboard-text="[[{{ supernote.path }}]]"
               title="Copy the path of the note to the clipboard.">
         <span class="bi-clipboard text-dark"></span>

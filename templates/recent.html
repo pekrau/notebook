@@ -4,7 +4,7 @@
   <div class="card-body small p-1">
     {% for note in get_recent() %}
     <div class="d-flex align-items-start">
-      <button class="btn btn-clipboard btn-sm btn-outline-none p-0 mx-1"
+      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
               data-clipboard-text="[[{{ note.path }}]]"
               title="Copy the path of the note to the clipboard.">
         <span class="bi-clipboard text-dark"></span>

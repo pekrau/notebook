@@ -3,7 +3,7 @@
 
 {% block head_title %}{{ note.title }}{% endblock %}
 {% block body_title %}
-<button class="btn btn-clipboard btn-outline-none p-0"
+<button class="btn btn-outline-none p-0 clipboard"
         data-clipboard-text="[[{{ note.path }}]]"
         title="Copy the path of the note to the clipboard.">
   <span class="bi-clipboard text-dark"></span>
@@ -43,9 +43,9 @@
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}"
        class="img-fluid border border-secondary">
-  <button class="btn btn-clipboard btn-outline-none"
+  <button class="btn btn-outline-none clipboard"
           data-clipboard-text="{{ url_for('file', path=note.path, _external=True) }}"
-        title="Copy the URL of the image to the clipboard.">
+        title="Copy the URL of the image to your clipboard.">
   <span class="bi-clipboard text-dark"></span>
 </button>
 </div>
