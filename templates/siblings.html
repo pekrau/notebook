@@ -1,24 +1,13 @@
 {# List of sibling notes. #}
+{% import 'macros.html' as macros with context %}
+
 {% if note.supernote %}
 <div class="card my-3">
   <div class="card-header bg-secondary text-white py-1">Sibling notes</div>
   <div class="card-body small p-1">
     {% for sibling in note.supernote.subnotes %}
     <div class="d-flex align-items-start">
-      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
-              data-clipboard-text="[[{{ sibling.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-      </button>
-      {% if sibling.starred %}
-      <span class="bi-star-fill text-warning me-1"></span>
-      {% endif %}
-      {% if sibling == note %}
-      <span class="text-muted">{{ sibling.title }}</span>
-      {% else %}
-      <a href="{{ sibling.url }}" class="text-decoration-none">
-        {{ sibling.title }}</a>
-      {% endif %}
+      {{ macros.note_link(sibling) }}
     </div>
     {% endfor %}
   </div>

@@ -1,19 +1,12 @@
 {# Most recently modified notes #}
+{% import 'macros.html' as macros with context %}
+
 <div class="card mb-3">
   <div class="card-header bg-info text-light py-1">Recently changed</div>
   <div class="card-body small p-1">
     {% for note in get_recent() %}
     <div class="d-flex align-items-start">
-      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
-              data-clipboard-text="[[{{ note.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-      </button>
-      {% if note.starred %}
-      <span class="bi-star-fill text-warning me-1"></span>
-      {% endif %}
-      <a href="{{ note.url }}" class="text-decoration-none">
-        {{ note.title }}</a>
+      {{ macros.note_link(note) }}
     </div>
     {% endfor %}
   </div>

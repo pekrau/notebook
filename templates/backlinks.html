@@ -1,19 +1,12 @@
 {# Notes linking to this note. #}
+{% import 'macros.html' as macros with context %}
+
 <div class="card">
   <div class="card-header bg-primary text-light py-1">Linking notes</div>
   <div class="card-body small p-1">
     {% for source in note.get_backlinks() %}
     <div class"d-flex align-items-start">
-      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
-              data-clipboard-text="[[{{ source.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-      </button>
-      {% if source.starred %}
-      <span class="bi-star-fill text-warning me-1"></span>
-      {% endif %}
-      <a href="{{ source.url }}" class="text-decoration-none">
-        {{ source.title }}</a>
+      {{ macros.note_link(source) }}
     </div>
     {% endfor %}
   </div>

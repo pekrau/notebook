@@ -4,17 +4,7 @@
   {% for note in notes %}
   <li class="my-1">
     <div class="d-flex justify-content-start">
-      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
-              data-clipboard-text="[[{{ note.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-      </button>
-      {{ starred(note) }}
-      {{ filetype(note) }}
-      <a href="{{ note.url }}" class="text-decoration-none">{{ note.title }}</a>
-      {% if note.subnotes and level == 1 %}
-      <span class="badge bg-secondary ms-2">{{ note.count }}</span>
-      {% endif %}
+      {{ note_link(note, level) }}
     </div>
     {% if note.subnotes %}
     <div class="ps-5">
@@ -27,18 +17,36 @@
 {% endif %}
 {% endmacro %}
 
+{% macro note_link(note, level=1) %}
+<button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
+        data-clipboard-text="[[{{ note.path }}]]"
+        title="Copy the path of the note to the clipboard.">
+  <span class="bi-clipboard text-dark"></span>
+</button>
+{{ starred(note) }}
+<a href="{{ note.url }}" class="text-decoration-none">{{ note.title }}</a>
+{{ filetype(note) }}
+{{ subnotes(note, level=level) }}
+{% endmacro %}
+
 {% macro starred(note) %}
 {% if note.starred %}
-<span class="bi-star-fill text-warning me-1"></span>
+<span class="bi-star-fill text-warning mx-1"></span>
 {% endif %}
 {% endmacro %}
 
 {% macro filetype(note) %}
 {% if note.is_image %}
-<span class="bi-image text-dark me-1"></span>
+<span class="bi-image text-dark mx-1"></span>
 {% elif note.is_file %}
-<span class="bi-file text-dark me-1"></span>
+<span class="bi-file text-dark mx-1"></span>
 {% elif note.is_text %}
-<span class="bi-file-font text-dark me-1"></span>
+<span class="bi-file-font text-dark mx-1"></span>
+{% endif %}
+{% endmacro %}
+
+{% macro subnotes(note, level=1) %}
+{% if note.subnotes and level <= 1 %}
+<span class="badge bg-secondary mx-1">{{ note.count }}</span>
 {% endif %}
 {% endmacro %}

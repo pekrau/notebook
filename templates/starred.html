@@ -1,4 +1,6 @@
 {# Starred notes #}
+{% import 'macros.html' as macros with context %}
+
 {% set starred = get_starred() %}
 <div class="card mb-3">
   <div class="card-header bg-warning py-1">
@@ -7,13 +9,7 @@
   <div class="card-body small p-1">
     {% for note in starred %}
     <div class="d-flex align-items-start">
-      <button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
-              data-clipboard-text="[[{{ note.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-      </button>
-      <a href="{{ note.url }}" class="text-decoration-none">
-        {{ note.title }}</a>
+      {{ macros.note_link(note) }}
     </div>
     {% endfor %}
     {% if not starred %}
