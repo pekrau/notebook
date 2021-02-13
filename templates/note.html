@@ -88,16 +88,21 @@
 <a href="{{ url_for('create', supernote=note.path, upload=True) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
    title="Upload a file into a new subnote for this note.">Upload file</a>
+{% if note.is_deletable() %}
 <form action="{{ url_for('edit', path=note.path) }}"
       class="d-grid my-3"
       method="POST">
   {{ get_csrf_token() }}
   <input type="hidden" name="_http_method" value="DELETE">
   <button role="submit" class="btn btn-sm btn-outline-danger"
-          {{ not note.is_deletable() and 'disabled' or '' }}
           onclick="return confirm('Really delete? Cannot be undone.')"
           >Delete</button>
 </form>
+{% else %}
+<div class="small text-muted my-3">
+  Cannot be deleted due to subnotes or links to it.
+</div>
+{% endif %}
 {% include 'starred.html' %}
 {% include 'recent.html' %}
 {% endblock %}

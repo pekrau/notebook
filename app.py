@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.11"
+__version__ = "0.9.12"
 
 import collections
 import json
@@ -604,8 +604,9 @@ class Note:
             os.rename(old_abspathfile, self.abspathfile)
         # Convert the old supernote to file, if no subnotes left in it.
         if len(old_supernote.subnotes) == 0:
-            with open(old_supernote.abspath + ".md", "w") as outfile:
-                outfile.write(old_supernote.text)
+            os.rename(os.path.join(old_supernote.abspath, "__text__.md"),
+                      old_supernote.abspath + ".md")
+            os.rmdir(old_supernote.abspath)
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
         for note in linking:
