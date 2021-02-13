@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.12"
+__version__ = "0.9.13"
 
 import collections
 import json
@@ -147,10 +147,7 @@ class Note:
         # The set of notes which link to any of the changing-path notes.
         linking = set()
         for note in changing:
-            try:
-                linking.update(BACKLINKS[note])
-            except KeyError:
-                pass
+            linking.update(BACKLINKS.get(note, []))
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -571,10 +568,7 @@ class Note:
         # The set of notes which link to any of the changing-path notes.
         linking = set()
         for note in changing:
-            try:
-                linking.update(BACKLINKS[note.path])
-            except KeyError:
-                pass
+            linking.update(BACKLINKS.get(note, []))
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
