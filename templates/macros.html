@@ -1,3 +1,5 @@
+{# Macro definitions. #}
+
 {% macro noteslist(notes, level) %}
 {% if notes and level > 0 %}
 <ul class="list-unstyled">
@@ -35,13 +37,14 @@
 {% endif %}
 {% endmacro %}
 
-{% macro filetype(note) %}
-{% if note.is_image %}
-<span class="bi-image text-dark mx-1"></span>
-{% elif note.is_file %}
-<span class="bi-file text-dark mx-1"></span>
-{% elif note.is_text %}
-<span class="bi-file-font text-dark mx-1"></span>
+{% macro filetype(note, dark=True) %}
+{% set color = dark and 'text-dark' or 'text-white' %}
+{% if note.has_image_file %}
+<span class="bi-image {{ color }} mx-1" title="{{ note.file_extension }}"></span>
+{% elif note.has_text_file %}
+<span class="bi-file-font {{ color }} mx-1" title="{{ note.file_extension }}"></span>
+{% elif note.has_file %}
+<span class="bi-file {{ color }} mx-1" title="{{ note.file_extension }}"></span>
 {% endif %}
 {% endmacro %}
 

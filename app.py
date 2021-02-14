@@ -151,7 +151,7 @@ class Note:
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
-        if self.is_file:
+        if self.has_file:
             old_abspathfile = self.abspathfile
         # Actually change the title of the note; rename the file/directory.
         self._title = title
@@ -162,7 +162,7 @@ class Note:
             abspath = self.abspath + ".md"
             os.rename(old_abspath + ".md", abspath)
         # Rename the attached file if there is one.
-        if self.is_file:
+        if self.has_file:
             os.rename(old_abspathfile, self.abspathfile)
         # Force the modified timestamp of the file to now.
         self.set_modified()
@@ -244,7 +244,7 @@ class Note:
 
     @property
     def abspathfile(self):
-        if not self.is_file:
+        if not self.has_file:
             raise ValueError("No file attached to this note.")
         return self.abspath + self.file_extension
 
@@ -256,22 +256,22 @@ class Note:
             return flask.url_for("home")
 
     @property
-    def is_file(self):
+    def has_file(self):
         return bool(self.file_extension)
 
     @property
     def file_size(self):
-        if not self.is_file: return 0
+        if not self.has_file: return 0
         return os.path.getsize(self.abspathfile)
 
     @property
-    def is_image(self):
-        if not self.is_file: return False
+    def has_image_file(self):
+        if not self.has_file: return False
         return self.file_extension in flask.current_app.config['IMAGE_EXTENSIONS']
 
     @property
-    def is_text(self):
-        if not self.is_file: return False
+    def has_text_file(self):
+        if not self.has_file: return False
         return self.file_extension in flask.current_app.config['TEXT_EXTENSIONS']
 
     @property
@@ -369,7 +369,7 @@ class Note:
         elif not extension:
             extension = ".bin"
         # Remove any existing attached file; may have different extension
-        if self.is_file:
+        if self.has_file:
             os.remove(self.abspathfile)
         filepath = os.path.join(self.supernote.abspath, self.title + extension)
         with open(filepath, "wb") as outfile:
@@ -378,7 +378,7 @@ class Note:
 
     def remove_file(self):
         "Remove the attached file, if any."
-        if not self.is_file: return
+        if not self.has_file: return
         os.remove(self.abspathfile)
         self.file_extension = None
 
@@ -387,9 +387,9 @@ class Note:
         config = flask.current_app.config
         if not pytesseract:
             raise ValueError("Module pytesseract has not been installed.")
-        if not self.is_file:
+        if not self.has_file:
             raise ValueError("No file to do OCR on.")
-        if not self.is_image:
+        if not self.has_image_file:
             raise ValueError("The file is not an image; Cannot do OCR on it.")
         if lang not in config["OCR_LANGS"]:
             raise ValueError(f"Cannot handle language '{lang}' for OCR.")
@@ -572,7 +572,7 @@ class Note:
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
-        if self.is_file:
+        if self.has_file:
             old_abspathfile = self.abspathfile
         # If the new supernote is a file, then convert it first to a directory.
         super_absfilepath = supernote.abspath + ".md"
@@ -594,7 +594,7 @@ class Note:
             new_abspath = self.abspath + ".md"
             os.rename(old_abspath + ".md", new_abspath)
         # Move the attached file if there is one.
-        if self.is_file:
+        if self.has_file:
             os.rename(old_abspathfile, self.abspathfile)
         # Convert the old supernote to file, if no subnotes left in it.
         if len(old_supernote.subnotes) == 0:
@@ -634,7 +634,7 @@ class Note:
         self.star(remove=True)
         self.remove_recent()
         os.remove(self.abspath + ".md")
-        if self.is_file:
+        if self.has_file:
             os.remove(self.abspathfile)
         self.supernote.subnotes.remove(self)
         # Convert supernote to file if no subnotes any longer. Not root!
@@ -691,12 +691,13 @@ class Timer:
 
 
 class NoteLink(marko.inline.InlineElement):
+    "Link to another note."
     pattern = r'\[\[ *(.+?) *\]\]'
     parse_children = False
     def __init__(self, match):
         self.ref = match.group(1)
 
-class NoteLinkRendererMixin:
+class NoteLinkRenderer:
     def render_note_link(self, element):
         try:
             note = get_note(element.ref)
@@ -707,51 +708,61 @@ class NoteLinkRendererMixin:
             # Proper link to target.
             return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
 
-class NoteLinkExt:
-    elements = [NoteLink]
-    renderer_mixins = [NoteLinkRendererMixin]
-
 class HashTag(marko.inline.InlineElement):
+    "Hashtag in the text of a note."
     pattern = r'#([^#].+?)\b'
     parse_children = False
     def __init__(self, match):
         self.word = match.group(1)
 
-class HashTagRendererMixin:
+class HashTagRenderer:
     def render_hash_tag(self, element):
         url = flask.url_for("hashtag", word=element.word)
         return f'<a class="fst-italic text-decoration-none" href="{url}">#{element.word}</a>'
 
-class HashTagExt:
-    elements = [HashTag]
-    renderer_mixins = [HashTagRendererMixin]
-
 class BareUrl(marko.inline.InlineElement):
+    "A bare URL in the note text converted automatically to a link."
     pattern = r'(https?://\S+)'
     parse_children = False
     def __init__(self, match):
         self.url = match.group(1)
 
-class BareUrlRendererMixin:
+class BareUrlRenderer:
     def render_bare_url(self, element):
         return f'<a class="text-decoration-none" href="{element.url}">{element.url}</a>'
 
-class BareUrlExt:
-    elements = [BareUrl]
-    renderer_mixins = [BareUrlRendererMixin]
+class Property(marko.inline.InlineElement):
+    "A property specified in the text of a note."
+    pattern = r'\$([\w_-]+) +([^;]*);'
+    parse_children = False
+    def __init__(self, match):
+        self.property = match.group(1)
+        self.value = match.group(2)
+
+class PropertyRenderer:
+    def render_property(self, element):
+        return f'<span class="text-success"><strong>${element.property}</strong>' \
+            f' {element.value};</span>'
+
+class Extensions:
+    elements = [NoteLink, HashTag, BareUrl, Property]
+    renderer_mixins = [NoteLinkRenderer, HashTagRenderer,
+                       BareUrlRenderer, PropertyRenderer]
 
 class HTMLRenderer(marko.html_renderer.HTMLRenderer):
-    "Fix various output for Bootstrap."
+    "Fix output for Bootstrap."
 
     def render_quote(self, element):
         return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(self.render_children(element))
 
 def get_md_parser():
-    return marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
+    "Get the extended Markdown parser for HTML."
+    return marko.Markdown(extensions=[Extensions],
                           renderer=HTMLRenderer)
 
 def get_md_ast_parser():
-    return marko.Markdown(extensions=[NoteLinkExt, HashTagExt, BareUrlExt],
+    "Get the extended Markdown parser for AST."
+    return marko.Markdown(extensions=[Extensions],
                           renderer=marko.ast_renderer.ASTRenderer)
 
 def markdown(value):
@@ -771,7 +782,7 @@ def flash_message(msg): flask.flash(str(msg), "message")
 def cleanup_title(title):
     "Clean up the title; remove or replace bad characters."
     # Convert bad characters to underscore.
-    # - Remove some particular offensive characters
+    # - Remove some particular offensive characters.
     # - Replace some other characters with blanks.
     # - Replace with underscore those bad for the OS filesystem.
     title = [c if c not in flask.current_app.config["BAD_CHARACTERS"]
@@ -1054,7 +1065,7 @@ def note(path):
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     return flask.render_template("note.html",
                                  note=note,
-                                 ocr=pytesseract and note.is_image)
+                                 ocr=pytesseract and note.has_image_file)
 
 @app.route("/file/<path:path>")
 def file(path):
@@ -1064,7 +1075,7 @@ def file(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    if not note.is_file:
+    if not note.has_file:
         raise KeyError(f"No file attached to note '{path}'")
     if flask.request.values.get("download"):
         return flask.send_file(note.abspathfile,

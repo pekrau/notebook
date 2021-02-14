@@ -39,7 +39,7 @@
 
 {% block main %}
 {{ note['text'] | markdown }}
-{% if note.is_image %}
+{% if note.has_image_file %}
 <div class="my-md-2">
   <img src="{{ url_for('file', path=note.path) }}"
        class="img-fluid border border-secondary">
@@ -49,13 +49,13 @@
   <span class="bi-clipboard text-dark"></span>
 </button>
 </div>
-{% endif %} {# if note.is_image #}
-{% if note.is_file %}
+{% endif %} {# if note.has_image_file #}
+{% if note.has_file %}
 <a href="{{ url_for('file', path=note.path, download=True) }}"
    class="btn btn-primary my-lg-2">
-  Download file {{ note.file_size | filesizeformat }}
+  Download {{ note.file_extension }} file {{ note.file_size | filesizeformat }}
 </a>
-{% endif %} {# if note.is_file #}
+{% endif %} {# if note.has_file #}
 {% if note.subnotes %}
 <div class="card">
   <div class="card-header">Subnotes</div>
@@ -87,7 +87,8 @@
    title="Create a subnote for this note.">Create subnote</a>
 <a href="{{ url_for('create', supernote=note.path, upload=True) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
-   title="Upload a file into a new subnote for this note.">Upload file</a>
+   title="Upload a file into a new subnote for this note.">
+  Upload file as subnote</a>
 {% if note.is_deletable() %}
 <form action="{{ url_for('edit', path=note.path) }}"
       class="d-grid my-3"

@@ -39,17 +39,17 @@
       {% if note.supernote %}
       <div class="row">
         <div class="col-md-8 mb-3">
-          <label for="upload" class="form-label">Upload file</label>
+          <label for="upload" class="form-label">Add file</label>
           <input class="form-control" type="file" name="upload" id="upload"
                  aria-describedby="uploadHelp">
           <div id="uploadHelp" class="form-text">
-            File to upload as attachment to note.
-            {% if note.is_file %}
+            File to upload as attachment to this note.
+            {% if note.has_file %}
             <strong>Note:</strong> Will overwrite the current file!
             {% endif %}
           </div>
         </div>
-        {% if note.is_file %}
+        {% if note.has_file %}
         <div class="col-md-4 mb-3">
           <label for="removefile" class="form-label"></label>
           <div class="form-check pt-3">
