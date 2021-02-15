@@ -45,6 +45,20 @@
                 {% endfor %}
               </ul>
             </li>
+            <li class="nav-item dropdown">
+              <a href="#" id="attributesDropdown"
+                 role="button" data-bs-toggle="dropdown"
+                 class="nav-link dropdown-toggle me-3"
+                 aria-expanded="false">Attributes</a>
+              <ul class="dropdown-menu" aria-labelledby="attributesDropdown">
+                {% for word in get_attributes() %}
+                <li>
+                  <a href="{{ url_for('attribute', word=word) }}"
+                     class="dropdown-item">{{ word }}</a>
+                </li>
+                {% endfor %}
+              </ul>
+            </li>
           </ul>
           {% block navbar %}
           {% endblock %}

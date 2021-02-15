@@ -1,7 +1,10 @@
 {% extends 'base.html' %}
 
-{% block head_title %}#{{ word }}{% endblock %}
-{% block body_title %}<i>#{{ word }}</i>{% endblock %}
+{% block head_title %}Hashtag {{ word }}{% endblock %}
+{% block body_title %}
+<span class="text-muted">Hashtag</span>
+<span class="text-primary">{{ word }}</span>
+{% endblock %}
 
 {% block left_main %}
 <div class="col-md-10">

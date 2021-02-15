@@ -1,6 +1,6 @@
 "Simple app for personal notebooks stored in the file system."
 
-__version__ = "0.9.14"
+__version__ = "0.9.15"
 
 import collections
 import json
@@ -26,6 +26,7 @@ STARRED = set()       # Starred notes.
 RECENT = None         # Deque of recently modified notes. Created in 'setup'.
 BACKLINKS = dict()    # Map target note -> set of source notes.
 HASHTAGS = dict()     # Map word -> set of notes.
+ATTRIBUTES = dict()   # Map word -> map values -> set of notes.
 
 
 def get_settings_filepath():
@@ -147,7 +148,7 @@ class Note:
         # The set of notes which link to any of the changing-path notes.
         linking = set()
         for note in changing:
-            linking.update(BACKLINKS.get(note, []))
+            linking.update(BACKLINKS.get(note, list()))
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -185,10 +186,12 @@ class Note:
         text = text.replace("\r", "")
         self.remove_backlinks()
         self.remove_hashtags()
+        self.remove_attributes()
         self._text = text
         self._ast = None        # Force recompile of AST.
         self.add_backlinks()
         self.add_hashtags()
+        self.add_attributes()
         self.write()
 
     text = property(get_text, set_text,
@@ -424,7 +427,7 @@ class Note:
                 if filename.startswith("_"): continue
                 if filename.endswith("~"): continue
                 basename, extension = os.path.splitext(filename)
-                # Proper note file; handle once directory listing is done.
+                # Note file; handle once directory listing is done.
                 if not extension or extension == ".md":
                     basenames.append(basename)
                 # Record attached files for later.
@@ -453,11 +456,11 @@ class Note:
 
     def get_backlinks(self):
         "Get the notes linking to this note."
-        return sorted(BACKLINKS.get(self, []))
+        return sorted(BACKLINKS.get(self, list()))
 
     def add_backlinks(self):
         "Add the links to other notes in this note to the lookup."
-        for link in self.find_linkpaths(self.ast["children"]):
+        for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
             except KeyError:    # Stale link.
@@ -467,7 +470,7 @@ class Note:
 
     def remove_backlinks(self):
         "Remove the links to other notes in this note from the lookup."
-        for link in self.find_linkpaths(self.ast["children"]):
+        for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
             except KeyError:    # Stale link.
@@ -478,7 +481,7 @@ class Note:
             else:
                 BACKLINKS[note].remove(self)
 
-    def find_linkpaths(self, children):
+    def find_links(self, children):
         """Find the note links in the children of the AST tree.
         Return the set of paths for the notes linked to.
         """
@@ -488,7 +491,7 @@ class Note:
                 if child.get("element") == "note_link":
                     result.add(child["ref"])
                 try:
-                    result.update(self.find_linkpaths(child["children"]))
+                    result.update(self.find_links(child["children"]))
                 except KeyError:
                     pass
         return result
@@ -501,13 +504,9 @@ class Note:
     def remove_hashtags(self):
         "Remove the hashtags in this note from the lookup."
         for word in self.find_hashtags(self.ast["children"]):
-            try:
-                HASHTAGS[word].remove(self)
-            except KeyError:
-                pass
-            else:
-                if not HASHTAGS[word]:
-                    HASHTAGS.pop(word)
+            HASHTAGS[word].remove(self)
+            if not HASHTAGS[word]:            # Remove if empty.
+                HASHTAGS.pop(word)
 
     def find_hashtags(self, children):
         """Find the hashtags in the children of the AST tree.
@@ -522,6 +521,43 @@ class Note:
                     result.update(self.find_hashtags(child["children"]))
                 except KeyError:
                     pass
+        return result
+
+    def add_attributes(self):
+        "Add the attributes in this note to the lookup."
+        for word, values in self.find_attributes(self.ast["children"]).items():
+            attribute = ATTRIBUTES.setdefault(word, dict())
+            for value in values:
+                attribute.setdefault(value, set()).add(self)
+
+    def remove_attributes(self):
+        "Remove the attributes in this note from the lookup."
+        for word, values in self.find_attributes(self.ast["children"]).items():
+            attr = ATTRIBUTES[word]
+            for value in values:
+                attr[value].remove(self)
+                if not attr[value]:
+                    attr.pop(value)
+            if not ATTRIBUTES[word]:          # Remove if empty.
+                ATTRIBUTES.pop(word)
+
+    def find_attributes(self, children):
+        """Find the attributes in the children of the AST tree.
+        Return the lookup of words to values.
+        """
+        result = dict()
+        if isinstance(children, list):
+            for child in children:
+                if child.get("element") == "attribute":
+                    attr = result.setdefault(child["word"], set())
+                    attr.add(child["value"])
+                try:
+                    attrs = self.find_attributes(child["children"])
+                except KeyError:
+                    pass
+                else:
+                    for key, value in attrs.items():
+                        result.setdefault(key, set()).update(value)
         return result
 
     def create_subnote(self, title, text):
@@ -568,7 +604,7 @@ class Note:
         # The set of notes which link to any of the changing-path notes.
         linking = set()
         for note in changing:
-            linking.update(BACKLINKS.get(note, []))
+            linking.update(BACKLINKS.get(note, list()))
         # Old abspath needed for renaming directory/file.
         old_abspath = self.abspath
         # Save file path for any attached file.
@@ -705,7 +741,7 @@ class NoteLinkRenderer:
             # Stale link; target does not exist.
             return f'<span class="text-danger">[[{element.ref}]]</span>'
         else:
-            # Proper link to target.
+            # Working link to target.
             return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
 
 class HashTag(marko.inline.InlineElement):
@@ -718,7 +754,8 @@ class HashTag(marko.inline.InlineElement):
 class HashTagRenderer:
     def render_hash_tag(self, element):
         url = flask.url_for("hashtag", word=element.word)
-        return f'<a class="fst-italic text-decoration-none" href="{url}">#{element.word}</a>'
+        return f'<a href="{url}" class="fw-bold text-decoration-none">' \
+               f'#{element.word}</a>'
 
 class BareUrl(marko.inline.InlineElement):
     "A bare URL in the note text converted automatically to a link."
@@ -731,23 +768,25 @@ class BareUrlRenderer:
     def render_bare_url(self, element):
         return f'<a class="text-decoration-none" href="{element.url}">{element.url}</a>'
 
-class Property(marko.inline.InlineElement):
-    "A property specified in the text of a note."
-    pattern = r'\$([\w_-]+) +([^;]*);'
+class Attribute(marko.inline.InlineElement):
+    "An attribute specified in the text of a note."
+    pattern = r'~([\w_-]+) +([^~]*)~'
     parse_children = False
     def __init__(self, match):
-        self.property = match.group(1)
+        self.word = match.group(1)
         self.value = match.group(2)
 
-class PropertyRenderer:
-    def render_property(self, element):
-        return f'<span class="text-success"><strong>${element.property}</strong>' \
-            f' {element.value};</span>'
+class AttributeRenderer:
+    def render_attribute(self, element):
+        url = flask.url_for("attribute", word=element.word)
+        return f'<a href="{url}"' \
+               ' class="fw-bold text-success text-decoration-none">' \
+               f'{element.word} {element.value}</a>'
 
 class Extensions:
-    elements = [NoteLink, HashTag, BareUrl, Property]
+    elements = [NoteLink, HashTag, BareUrl, Attribute]
     renderer_mixins = [NoteLinkRenderer, HashTagRenderer,
-                       BareUrlRenderer, PropertyRenderer]
+                       BareUrlRenderer, AttributeRenderer]
 
 class HTMLRenderer(marko.html_renderer.HTMLRenderer):
     "Fix output for Bootstrap."
@@ -814,6 +853,8 @@ def get_starred(): return sorted(STARRED)
 def get_recent(): return list(RECENT)
 
 def get_hashtags(): return sorted(HASHTAGS.keys())
+
+def get_attributes(): return sorted(ATTRIBUTES.keys())
 
 def check_recent_ordered():
     "When DEBUG: Check that RECENT is ordered."
@@ -935,6 +976,7 @@ def setup():
     STARRED.clear()
     BACKLINKS.clear()
     HASHTAGS.clear()
+    ATTRIBUTES.clear()
     ROOT = Note(None, None)
     # Nothing more to do if no notebooks.
     if not flask.current_app.config["NOTEBOOK_DIRPATH"]: return
@@ -959,14 +1001,19 @@ def setup():
                     pass
     except OSError:
         pass
-    # Set up the backlinks and hashtags for all notes.
+    # Set up the backlinks, hashtags and attributes for all notes.
     for note in ROOT.traverse():
         note.add_backlinks()
         note.add_hashtags()
+        note.add_attributes()
     check_recent_ordered()
     check_synced_filesystem()
     check_synced_memory()
     flash_message(f"Setup {timer}")
+    for word, values in ATTRIBUTES.items():
+        print(word)
+        for value, notes in values.items():
+            print("  ", value, notes)
 
 @app.context_processor
 def setup_template_context():
@@ -978,7 +1025,8 @@ def setup_template_context():
                 get_csrf_token=get_csrf_token,
                 get_starred=get_starred,
                 get_recent=get_recent,
-                get_hashtags=get_hashtags)
+                get_hashtags=get_hashtags,
+                get_attributes=get_attributes)
 
 @app.before_request
 def prepare():
@@ -1222,7 +1270,13 @@ def star(path):
 def hashtag(word):
     return flask.render_template("hashtag.html",
                                  word=word,
-                                 notes=sorted(HASHTAGS.get(word, [])))
+                                 notes=sorted(HASHTAGS.get(word, list())))
+
+@app.route("/attribute/<word>")
+def attribute(word):
+    values = sorted([(k, sorted(v)) for k, v in
+                     ATTRIBUTES.get(word, dict()).items()])
+    return flask.render_template("attribute.html", word=word, values=values)
 
 @app.route("/search")
 def search():
