@@ -1,21 +1,21 @@
 {% extends 'base.html' %}
 
-{% block head_title %}Add notebook{% endblock %}
-{% block body_title %}Add notebook{% endblock %}
+{% block head_title %}Add scrapbook{% endblock %}
+{% block body_title %}Add scrapbook{% endblock %}
 
 {% block main %}
 <div class="card">
   <div class="card-body py-0">
-    <form action="{{ url_for('notebook') }}"
+    <form action="{{ url_for('scrapbook') }}"
           method="POST">
       {{ get_csrf_token() }}
       <div class="mb-3">
-        <label for="notebook" class="col-form-label">Directory path</label>
-        <input type="text" name="notebook" id="notebook"
-               aria-describedby="notebookHelp"
+        <label for="scrapbook" class="col-form-label">Directory path</label>
+        <input type="text" name="scrapbook" id="scrapbook"
+               aria-describedby="scrapbookHelp"
                class="form-control">
-        <div id="notebookHelp" class="form-text">
-          Path of the notebook directory to add. If the directory does
+        <div id="scrapbookHelp" class="form-text">
+          Path of the scrapbook directory to add. If the directory does
           not exist it will be created.
           <br>
           A relative path is relative to the home directory of your

@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}notebook {{ g.config['NOTEBOOK_TITLE'] }}{% endblock %}
+{% block head_title %}scrapbook {{ g.config['SCRAPBOOK_TITLE'] }}{% endblock %}
 {% block body_title %}
-<span class="text-muted">notebook</span>
-{{ g.config['NOTEBOOK_TITLE'] }}
+<span class="text-muted">scrapbook</span>
+{{ g.config['SCRAPBOOK_TITLE'] }}
 {% endblock %}
 
 {% block meta %}
@@ -13,7 +13,7 @@
 
 {% block left %}
 <div class="card mb-3">
-  <div class="card card-header">In this notebook</div>
+  <div class="card card-header">In this scrapbook</div>
   <ul class="list-group list-group-flush">
     <li class="list-group-item list-group-item-light">
       {{ root.count_traverse() }} notes
@@ -24,27 +24,27 @@
   </ul>
 </div>
 <div class="card mb-3">
-  <div class="card card-header text-white bg-dark">Notebooks</div>
+  <div class="card card-header text-white bg-dark">Scrapbooks</div>
   <ul class="list-group list-group-flush">
-    {% for title, path in notebooks %}
-    {% if title == g.config['NOTEBOOK_TITLE'] %}
+    {% for title, path in scrapbooks %}
+    {% if title == g.config['SCRAPBOOK_TITLE'] %}
     <li class="list-group-item">
-      <a href="{{ url_for('notebook', title=title) }}"
+      <a href="{{ url_for('scrapbook', title=title) }}"
          title="{{ path }}" class="text-decoration-none fw-bold">{{ title }}</a>
     </li>
     {% else %}
     <li class="list-group-item">
-      <a href="{{ url_for('switch_notebook', title=title) }}"
+      <a href="{{ url_for('switch_scrapbook', title=title) }}"
          title="{{ path }}" class="text-decoration-none">{{ title }}</a>
     </li>
     {% endif %}
     {% endfor %}
   </ul>
 </div>
-<a href="{{ url_for('notebook') }}"
+<a href="{{ url_for('scrapbook') }}"
    class="btn btn-outline-dark d-grid"
-   title="Add an existing directory as notebook.">Add new notebook</a>
-<form action="{{ url_for('notebook') }}"
+   title="Add an existing directory as scrapbook.">Add new scrapbook</a>
+<form action="{{ url_for('scrapbook') }}"
       method="POST">
   {{ get_csrf_token() }}
   <input type="hidden" name="_http_method" value="DELETE">
@@ -52,7 +52,7 @@
     <button type="submit" class="btn btn-outline-danger small"
             onclick="return confirm('Remove will NOT delete the directory itself.')"
             >
-      Remove this notebook</button>
+      Remove this scrapbook</button>
   </div>
 </form>  
 {% endblock %} {# block left #}

@@ -1,4 +1,4 @@
-"Simple app for personal notebooks stored in the file system."
+"Simple app for personal scrapbooks stored in the file system."
 
 __version__ = "0.9.15"
 
@@ -31,7 +31,7 @@ ATTRIBUTES = dict()   # Map word -> map values -> set of notes.
 
 def get_settings_filepath():
     "Get the filepath for the user's settings file."
-    return os.path.join(os.path.expanduser("~/.notebooks"))
+    return os.path.join(os.path.expanduser("~/.scrapbooks"))
 
 def get_settings():
     "Return the settings."
@@ -48,7 +48,7 @@ def get_settings():
                     OCR_LANGS = [],
                     OCR_TIMEOUT = 4.0,
                     MAX_RECENT = 12,
-                    NOTEBOOKS = [])
+                    SCRAPBOOKS = [])
     filepath = get_settings_filepath()
     try:
         with open(filepath) as infile:
@@ -61,15 +61,15 @@ def get_settings():
         settings["BAD_CHARACTERS"] = "/\\.\n"
     else:                       # Assume Windows; what about MacOS?
         settings["BAD_CHARACTERS"] = '<>:"/\\|?*/.\n'
-    # The first notebook is the starting one.
+    # The first scrapbook is the starting one.
     try:
-        notebook = settings["NOTEBOOKS"][0]
-    except IndexError:          # No notebook at all.
-        settings["NOTEBOOK_DIRPATH"] = None
-        settings["NOTEBOOK_TITLE"] = None
+        scrapbook = settings["SCRAPBOOKS"][0]
+    except IndexError:          # No scrapbook at all.
+        settings["SCRAPBOOK_DIRPATH"] = None
+        settings["SCRAPBOOK_TITLE"] = None
     else:
-        settings["NOTEBOOK_DIRPATH"] = notebook
-        settings["NOTEBOOK_TITLE"] = os.path.basename(notebook)
+        settings["SCRAPBOOK_DIRPATH"] = scrapbook
+        settings["SCRAPBOOK_TITLE"] = os.path.basename(scrapbook)
     if settings["DEBUG"]:
         settings["TEMPLATES_AUTO_RELOAD"] = True
     return settings
@@ -85,7 +85,7 @@ def write_settings():
     except OSError:
         settings = {}
     with open(filepath, "w") as outfile:
-        for key in ["NOTEBOOKS"]:
+        for key in ["SCRAPBOOKS"]:
             settings[key] = flask.current_app.config[key]
         json.dump(settings, outfile, indent=2)
 
@@ -136,7 +136,7 @@ class Note:
         if title[0] == "_": raise ValueError
         if title[-1] == "~": raise ValueError
         if self.title == title: return
-        new_abspath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"],
+        new_abspath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"],
                                    self.supernote.path,
                                    title)
         if os.path.exists(new_abspath): raise KeyError
@@ -241,9 +241,9 @@ class Note:
         path = self.path
         if path:
             return os.path.join(
-                flask.current_app.config["NOTEBOOK_DIRPATH"], path)
+                flask.current_app.config["SCRAPBOOK_DIRPATH"], path)
         else:
-            return flask.current_app.config["NOTEBOOK_DIRPATH"]
+            return flask.current_app.config["SCRAPBOOK_DIRPATH"]
 
     @property
     def abspathfile(self):
@@ -295,7 +295,7 @@ class Note:
             STARRED.add(self)
         else:
             return              # No change; no need to update file.
-        filepath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"],
+        filepath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"],
                                 "__starred__.json")
         with open(filepath, "w") as outfile:
             json.dump({"paths": [n.path for n in STARRED]}, outfile)
@@ -830,7 +830,7 @@ def cleanup_title(title):
     title = [c for c in title if c not in "\a\b\r"]
     title = [c if c not in "\t\n" else " " for c in title]
     title = "".join(title)
-    title = title.lstrip("_")         # Avoid confusion with 'notebooks' files.
+    title = title.lstrip("_")         # Avoid confusion with 'scrapbooks' files.
     return title.strip()
 
 def get_note(path):
@@ -878,7 +878,7 @@ def check_synced_memory():
     "When DEBUG: Check that files/directories exist as notes in memory."
     if not flask.current_app.config["DEBUG"]: return
     flask.current_app.logger.debug("checked_synced_memory")
-    root = flask.current_app.config["NOTEBOOK_DIRPATH"]
+    root = flask.current_app.config["SCRAPBOOK_DIRPATH"]
     try:
         abspath = os.path.join(root, "__text__.md")
         with open(abspath) as infile:
@@ -978,8 +978,8 @@ def setup():
     HASHTAGS.clear()
     ATTRIBUTES.clear()
     ROOT = Note(None, None)
-    # Nothing more to do if no notebooks.
-    if not flask.current_app.config["NOTEBOOK_DIRPATH"]: return
+    # Nothing more to do if no scrapbooks.
+    if not flask.current_app.config["SCRAPBOOK_DIRPATH"]: return
     # Read in all notes.
     ROOT.read()
     # Set up most recently modified notes.
@@ -991,7 +991,7 @@ def setup():
                                maxlen=flask.current_app.config["MAX_RECENT"])
     # Get the starred notes.
     try:
-        filepath = os.path.join(flask.current_app.config["NOTEBOOK_DIRPATH"], 
+        filepath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], 
                                 "__starred__.json")
         with open(filepath) as infile:
             for path in json.load(infile)["paths"]:
@@ -1035,21 +1035,21 @@ def prepare():
 
 @app.route("/")
 def home():
-    "Home page; root note of the current notebook."
-    if not flask.current_app.config["NOTEBOOK_DIRPATH"]:
-        return flask.redirect(flask.url_for("notebook"))
+    "Home page; root note of the current scrapbook."
+    if not flask.current_app.config["SCRAPBOOK_DIRPATH"]:
+        return flask.redirect(flask.url_for("scrapbook"))
     n_links = sum([len(s) for s in BACKLINKS.values()])
-    notebooks = [(os.path.basename(n), n) 
-                 for n in flask.current_app.config["NOTEBOOKS"]]
+    scrapbooks = [(os.path.basename(n), n) 
+                 for n in flask.current_app.config["SCRAPBOOKS"]]
     return flask.render_template("home.html", 
                                  root=ROOT,
                                  n_links=n_links,
-                                 notebooks=notebooks)
+                                 scrapbooks=scrapbooks)
 
 @app.route("/note")
 @app.route("/note/")
 def root():
-    "Root note of the current notebook; redirect to home."
+    "Root note of the current scrapbook; redirect to home."
     return flask.redirect(flask.url_for("home"))
 
 @app.route("/create", methods=["GET", "POST"])
@@ -1305,18 +1305,18 @@ def search():
                                  notes=sorted(notes),
                                  terms=flask.request.values.get("terms"))
 
-@app.route("/notebook", methods=["GET", "POST", "DELETE"])
-def notebook():
-    "Add a new notebook and switch to it. Or delete the current notebook."
+@app.route("/scrapbook", methods=["GET", "POST", "DELETE"])
+def scrapbook():
+    "Add a new scrapbook and switch to it. Or delete the current scrapbook."
     method = get_http_method()
 
     if method == "GET":
-        return flask.render_template("notebook.html")
+        return flask.render_template("scrapbook.html")
 
     elif method == "POST":
         try:
             try:
-                dirpath = flask.request.form["notebook"]
+                dirpath = flask.request.form["scrapbook"]
                 if not dirpath: raise KeyError
             except KeyError:
                 raise ValueError("No path given.")
@@ -1325,16 +1325,16 @@ def notebook():
             dirpath = os.path.normpath(dirpath)
             if not os.path.isabs(dirpath):
                 dirpath = os.path.join(os.path.expanduser("~"), dirpath)
-            # If the notebook already exists, no need to do anything.
-            if dirpath in flask.current_app.config["NOTEBOOKS"]:
+            # If the scrapbook already exists, no need to do anything.
+            if dirpath in flask.current_app.config["SCRAPBOOKS"]:
                 pass
-            # Directory exists; add it as a notebook and go to it.
+            # Directory exists; add it as a scrapbook and go to it.
             elif os.path.isdir(dirpath):
                 if not (os.access(dirpath, os.R_OK) and 
                         os.access(dirpath, os.W_OK)):
                     raise ValueError(f"No read/write access to '{dirpath}'")
                 else:
-                    flask.current_app.config["NOTEBOOKS"].append(dirpath)
+                    flask.current_app.config["SCRAPBOOKS"].append(dirpath)
                     write_settings()
             # The path is a file; not allowed.
             elif os.path.isfile(dirpath):
@@ -1345,45 +1345,45 @@ def notebook():
                     os.mkdir(dirpath)
                 except OSError as error:
                     raise ValueError(str(error))
-                flash_message("Added notebook and created"
+                flash_message("Added scrapbook and created"
                               f" the directory '{dirpath}'")
-                flask.current_app.config["NOTEBOOKS"].append(dirpath)
+                flask.current_app.config["SCRAPBOOKS"].append(dirpath)
                 write_settings()
         except ValueError as error:
             flash_error(error)
             return flask.redirect(flask.url_for("home"))
-        return switch_notebook(dirpath)
+        return switch_scrapbook(dirpath)
 
     elif method == "DELETE":
-        flask.current_app.config["NOTEBOOKS"].pop(0)
+        flask.current_app.config["SCRAPBOOKS"].pop(0)
         write_settings()
         try:
-            notebook = flask.current_app.config["NOTEBOOKS"][0]
+            scrapbook = flask.current_app.config["SCRAPBOOKS"][0]
         except IndexError:
-            flask.current_app.config["NOTEBOOK_DIRPATH"] = None
-            flask.current_app.config["NOTEBOOK_TITLE"] = None
+            flask.current_app.config["SCRAPBOOK_DIRPATH"] = None
+            flask.current_app.config["SCRAPBOOK_TITLE"] = None
             setup()
             return flask.redirect(flask.url_for("home"))
         else:
-            return switch_notebook(notebook)
+            return switch_scrapbook(scrapbook)
 
-@app.route("/notebook/<title>")
-def switch_notebook(title):
-    "Change to another notebook. Yes, using GET for this is arguably bad."
-    for notebook in flask.current_app.config["NOTEBOOKS"]:
-        if title == os.path.basename(notebook): break
+@app.route("/scrapbook/<title>")
+def switch_scrapbook(title):
+    "Change to another scrapbook. Yes, using GET for this is arguably bad."
+    for scrapbook in flask.current_app.config["SCRAPBOOKS"]:
+        if title == os.path.basename(scrapbook): break
     else:
-        flash_error(f"No such notebook '{title}'.")
+        flash_error(f"No such scrapbook '{title}'.")
         return flask.redirect(flask.url_for("home"))
-    return switch_notebook(notebook)
+    return switch_scrapbook(scrapbook)
 
-def switch_notebook(notebook):
-    "Switch to the given notebook."
+def switch_scrapbook(scrapbook):
+    "Switch to the given scrapbook."
     # Move to the top of the list.
-    flask.current_app.config["NOTEBOOKS"].remove(notebook)
-    flask.current_app.config["NOTEBOOKS"].insert(0, notebook)
-    flask.current_app.config["NOTEBOOK_DIRPATH"] = notebook
-    flask.current_app.config["NOTEBOOK_TITLE"] = os.path.basename(notebook)
+    flask.current_app.config["SCRAPBOOKS"].remove(scrapbook)
+    flask.current_app.config["SCRAPBOOKS"].insert(0, scrapbook)
+    flask.current_app.config["SCRAPBOOK_DIRPATH"] = scrapbook
+    flask.current_app.config["SCRAPBOOK_TITLE"] = os.path.basename(scrapbook)
     write_settings()
     setup()
     return flask.redirect(flask.url_for("home"))
