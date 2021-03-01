@@ -1,13 +1,17 @@
 {# Notes linking to this note. #}
 {% import 'macros.html' as macros with context %}
 
+{% set backlinks = note.get_backlinks() %}
 <div class="card">
   <div class="card-header bg-primary text-light py-1">Linking notes</div>
   <div class="card-body small p-1">
-    {% for source in note.get_backlinks() %}
+    {% for source in backlinks %}
     <div class"d-flex align-items-start">
       {{ macros.note_link(source) }}
     </div>
     {% endfor %}
+    {% if not backlinks %}
+    <i class="mx-2">none</i>
+    {% endif %}
   </div>
 </div>

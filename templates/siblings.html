@@ -2,14 +2,18 @@
 {% import 'macros.html' as macros with context %}
 
 {% if note.supernote %}
+{% set siblings = note.siblings() %}
 <div class="card my-3">
   <div class="card-header bg-secondary text-white py-1">Sibling notes</div>
   <div class="card-body small p-1">
-    {% for sibling in note.supernote.subnotes %}
+    {% for sibling in siblings %}
     <div class="d-flex align-items-start">
       {{ macros.note_link(sibling) }}
     </div>
     {% endfor %}
+    {% if not siblings %}
+    <i class="mx-2">none</i>
+    {% endif %}
   </div>
 </div>
 {% endif %} {# if note.supernote #}

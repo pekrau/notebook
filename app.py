@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "0.9.15"
+__version__ = "0.9.16"
 
 import collections
 import json
@@ -327,6 +327,17 @@ class Note:
             return self.supernote.supernotes() + [self.supernote]
         else:
             return []
+
+    def siblings(self):
+        """Return the list of sibling notes; subnotes for 
+        the supernote of this one, excluding itself.
+        """
+        if self.supernote:
+            result = list(self.supernote.subnotes)
+            result.remove(self)
+        else:
+            result = []
+        return result
 
     def traverse(self):
         "Return a generator traversing this note and its subnotes."
