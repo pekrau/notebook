@@ -45,9 +45,9 @@
        class="img-fluid border border-secondary">
   <button class="btn btn-outline-none clipboard"
           data-clipboard-text="{{ url_for('file', path=note.path, _external=True) }}"
-        title="Copy the URL of the image to your clipboard.">
-  <span class="bi-clipboard text-dark"></span>
-</button>
+          title="Copy the URL of the image to your clipboard.">
+    <span class="bi-clipboard text-dark"></span>
+  </button>
 </div>
 {% endif %} {# if note.has_image_file #}
 {% if note.has_file %}
@@ -96,8 +96,8 @@
   {{ get_csrf_token() }}
   <input type="hidden" name="_http_method" value="DELETE">
   <button role="submit" class="btn btn-sm btn-outline-danger"
-          onclick="return confirm('Really delete? Cannot be undone.')"
-          >Delete</button>
+          onclick="return confirm('Really delete? Cannot be undone.')">
+    Delete</button>
 </form>
 {% else %}
 <div class="small text-muted my-3">
