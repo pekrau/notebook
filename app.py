@@ -55,6 +55,12 @@ def get_settings():
             settings.update(json.load(infile))
     except OSError:
         pass
+    if pytesseract and not settings["OCR_LANGS"]:
+        settings["OCR_LANGS"] = pytesseract.get_languages()
+        try:
+            settings["OCR_LANGS"].remove("osd")
+        except ValueError:
+            pass
     settings["SETTINGS_FILEPATH"] = filepath
     # Set the bad characters for titles/filenames.
     if platform.system() == 'Linux':
