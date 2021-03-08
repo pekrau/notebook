@@ -1,8 +1,9 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "0.9.16"
+__version__ = "1.0.0"
 
 import collections
+import importlib
 import json
 import os
 import platform
@@ -15,11 +16,6 @@ import marko
 import marko.ast_renderer
 import jinja2.utils
 
-try:
-    import pytesseract
-except ImportError:
-    pytesseract = False
-
 
 ROOT = None           # The root note. Created in 'setup'.
 STARRED = set()       # Starred notes.
@@ -28,6 +24,7 @@ BACKLINKS = dict()    # Map target note -> set of source notes.
 HASHTAGS = dict()     # Map word -> set of notes.
 ATTRIBUTES = dict()   # Map word -> map values -> set of notes.
 
+OPERATIONS = dict()   # Map operation name -> operation object.
 
 def get_settings_filepath():
     "Get the filepath for the user's settings file."
@@ -42,11 +39,6 @@ def get_settings():
                     JSON_AS_ASCII = False,
                     IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
                     TEXT_EXTENSIONS = [".pdf", ".docx", ".txt"],
-                     # Requires tesseract installed, with appropriate data.
-                    OCR_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"],
-                    # Add the languages for which tesseract data is available.
-                    OCR_LANGS = [],
-                    OCR_TIMEOUT = 4.0,
                     MAX_RECENT = 12,
                     SCRAPBOOKS = [])
     filepath = get_settings_filepath()
@@ -55,12 +47,6 @@ def get_settings():
             settings.update(json.load(infile))
     except OSError:
         pass
-    if pytesseract and not settings["OCR_LANGS"]:
-        settings["OCR_LANGS"] = pytesseract.get_languages()
-        try:
-            settings["OCR_LANGS"].remove("osd")
-        except ValueError:
-            pass
     settings["SETTINGS_FILEPATH"] = filepath
     # Set the bad characters for titles/filenames.
     if platform.system() == 'Linux':
@@ -94,6 +80,16 @@ def write_settings():
         for key in ["SCRAPBOOKS"]:
             settings[key] = flask.current_app.config[key]
         json.dump(settings, outfile, indent=2)
+
+def load_operations(app):
+    "Load the operations modules specified in the settings."
+    for name in app.config.get('OPERATIONS', []):
+        module = importlib.import_module(name)
+        OPERATIONS[name] = module.Operation(app.config)
+
+def get_operations(note):
+    "Get the list of operations relevant to the note."
+    return [o for o in OPERATIONS.values() if o.is_relevant(note)]
 
 
 class Note:
@@ -401,24 +397,6 @@ class Note:
         if not self.has_file: return
         os.remove(self.abspathfile)
         self.file_extension = None
-
-    def get_ocr_text(self, lang):
-        "Perform OCR in the file image, using the languages given."
-        config = flask.current_app.config
-        if not pytesseract:
-            raise ValueError("Module pytesseract has not been installed.")
-        if not self.has_file:
-            raise ValueError("No file to do OCR on.")
-        if not self.has_image_file:
-            raise ValueError("The file is not an image; Cannot do OCR on it.")
-        if lang not in config["OCR_LANGS"]:
-            raise ValueError(f"Cannot handle language '{lang}' for OCR.")
-        try:
-            return pytesseract.image_to_string(self.abspathfile,
-                                               lang=lang,
-                                               timeout=config["OCR_TIMEOUT"])
-        except RuntimeError:
-            raise ValueError("pytesseract timeout.")
 
     def read(self):
         "Read this note and its subnotes from disk."
@@ -1039,16 +1017,12 @@ def setup_template_context():
                 flash_error=flash_error,
                 flash_warning=flash_warning,
                 flash_message=flash_message,
+                get_operations=get_operations,
                 get_csrf_token=get_csrf_token,
                 get_starred=get_starred,
                 get_recent=get_recent,
                 get_hashtags=get_hashtags,
                 get_attributes=get_attributes)
-
-@app.before_request
-def prepare():
-    "Add the config dictionary to the 'g' object."
-    flask.g.config = flask.current_app.config
 
 @app.route("/")
 def home():
@@ -1128,9 +1102,7 @@ def note(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    return flask.render_template("note.html",
-                                 note=note,
-                                 ocr=pytesseract and note.has_image_file)
+    return flask.render_template("note.html", note=note)
 
 @app.route("/file/<path:path>")
 def file(path):
@@ -1212,9 +1184,8 @@ def edit(path=""):
         check_synced_memory()
         return flask.redirect(note.supernote.url)
 
-@app.route("/ocr/<path:path>", methods=["POST"])
-def ocr(path):
-    "Perform OCR on the image file of the note and add the text."
+@app.route("/op/<name>/<path:path>", methods=["POST"])
+def operation(name, path):
     get_http_method()           # Does CSRF check.
     try:
         note = get_note(path)
@@ -1222,19 +1193,21 @@ def ocr(path):
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     try:
-        lang = flask.request.form.get("ocr_lang")
-        if not lang: raise ValueError("Unknown language for tesseract.")
-        text = note.get_ocr_text(lang).strip()
-        if note.text:
-            note.text = note.text + "\n\n" + text
-        else:
-            note.text = text
+        op = OPERATIONS[name]
+    except KeyError:
+        flash_error(f"No such operation: '{name}'")
+        return flask.redirect(flask.url_for("note", path=path))
+    try:
+        if not op.is_relevant(note):
+            raise ValueError("The operation is not relevant for this note.")
+        op.execute(note, flask.request.form)
         note.put_recent()
     except ValueError as error:
         flash_error(error)
     check_recent_ordered()
-    return flask.redirect(flask.url_for("note", path=note.path))
-    
+    return flask.redirect(flask.url_for("note", path=path))
+
+
 @app.route("/move/<path:path>", methods=["GET", "POST"])
 def move(path):
     "Move the given note to a new supernote."
@@ -1369,7 +1342,7 @@ def scrapbook():
         except ValueError as error:
             flash_error(error)
             return flask.redirect(flask.url_for("home"))
-        return switch_scrapbook(dirpath)
+        return change_scrapbook(dirpath)
 
     elif method == "DELETE":
         flask.current_app.config["SCRAPBOOKS"].pop(0)
@@ -1382,20 +1355,20 @@ def scrapbook():
             setup()
             return flask.redirect(flask.url_for("home"))
         else:
-            return switch_scrapbook(scrapbook)
+            return change_scrapbook(scrapbook)
 
 @app.route("/scrapbook/<title>")
 def switch_scrapbook(title):
-    "Change to another scrapbook. Yes, using GET for this is arguably bad."
+    "Switch to another scrapbook. Yes, using GET for this is arguably bad."
     for scrapbook in flask.current_app.config["SCRAPBOOKS"]:
         if title == os.path.basename(scrapbook): break
     else:
         flash_error(f"No such scrapbook '{title}'.")
         return flask.redirect(flask.url_for("home"))
-    return switch_scrapbook(scrapbook)
+    return change_scrapbook(scrapbook)
 
-def switch_scrapbook(scrapbook):
-    "Switch to the given scrapbook."
+def change_scrapbook(scrapbook):
+    "Change to the given scrapbook."
     # Move to the top of the list.
     flask.current_app.config["SCRAPBOOKS"].remove(scrapbook)
     flask.current_app.config["SCRAPBOOKS"].insert(0, scrapbook)
@@ -1409,4 +1382,5 @@ def switch_scrapbook(scrapbook):
 if __name__ == "__main__":
     settings = get_settings()
     app.config.from_mapping(settings)
+    load_operations(app)
     app.run(debug=settings["DEBUG"])

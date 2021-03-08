@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}scrapbook {{ g.config['SCRAPBOOK_TITLE'] }}{% endblock %}
+{% block head_title %}scrapbook {{ config['SCRAPBOOK_TITLE'] }}{% endblock %}
 {% block body_title %}
 <span class="text-muted">scrapbook</span>
-{{ g.config['SCRAPBOOK_TITLE'] }}
+{{ config['SCRAPBOOK_TITLE'] }}
 {% endblock %}
 
 {% block meta %}
@@ -27,7 +27,7 @@
   <div class="card card-header text-white bg-dark">Scrapbooks</div>
   <ul class="list-group list-group-flush">
     {% for title, path in scrapbooks %}
-    {% if title == g.config['SCRAPBOOK_TITLE'] %}
+    {% if title == config['SCRAPBOOK_TITLE'] %}
     <li class="list-group-item">
       <a href="{{ url_for('scrapbook', title=title) }}"
          title="{{ path }}" class="text-decoration-none fw-bold">{{ title }}</a>

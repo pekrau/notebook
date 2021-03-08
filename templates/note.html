@@ -76,12 +76,6 @@
 <a href="{{ url_for('create', supernote=note.supernote.path, source=note.path) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
    title="Create a copy of this note.">Create copy</a>
-{% if ocr %}
-<div class="d-grid mb-1">
-  <button type="button" class="btn btn-primary btn-sm"
-          data-bs-toggle="modal" data-bs-target="#ocr_modal">Do OCR</button>
-</div>
-{% endif %} {# if ocr #}
 <a href="{{ url_for('create', supernote=note.path) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
    title="Create a subnote for this note.">Create subnote</a>
@@ -103,33 +97,60 @@
 <div class="small text-muted my-3">
   Cannot be deleted due to subnotes or links to it.
 </div>
-{% endif %}
+{% endif %} {# if note.is_deletable() #}
+
+<div class="my-3">
+  {% for operation in get_operations(note) %}
+  <div class="d-grid mb-1">
+    <button type="button" class="btn btn-outline-primary btn-sm"
+            data-bs-toggle="modal" data-bs-target="#{{ operation.name }}Modal"
+            title="{{ operation.description }}">
+      {{ operation.title }}</button>
+  </div>
+  {% endfor %}
+</div>
+
 {% include 'starred.html' %}
 {% include 'recent.html' %}
 {% endblock %}
 
 {% block modals %}
-<div class="modal fade" id="ocr_modal" tabindex="-1">
+{% for operation in get_operations(note) %}
+<div class="modal fade" id="{{ operation.name }}Modal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form action="{{ url_for('ocr', path=note.path) }}"
+      <form action="{{ url_for('operation', name=operation.name, path=note.path) }}"
             method="POST">
         {{ get_csrf_token() }}
         <div class="modal-header">
-          <h5>Extract text from the image by OCR.</h5>
+          <h5>{{ operation.title }}</h5>
           <button type="button" data-bs-dismiss="modal"
                   class="btn-close" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <label for="ocr_lang" class="form-label">Select language</label>
-          <div class="form-control" id="ocr_lang">
-            {% for lang in g.config["OCR_LANGS"] %}
-            <div class="form-check form-check-inline">
-              <input type="radio" name="ocr_lang" id="ocr_lang_{{ lang }}"
-                     class="form-check-input" 
-                     value="{{ lang }}">
-              <label class="form-check-label" for="ocr_lang_{{ lang }}">
-                {{ lang }}</label>
+          <p>{{ operation.description }}</p>
+          <div class="card">
+            {% for key, param in operation.get_parameters(note).items() %}
+            <div class="card-body">
+              <label for="{{ operation.name}}-{{ key }}" class="form-label">
+                {{ param['description'] }}</label>
+              {% if param['type'] == 'select' %}
+              <div class="form-control" id="{{ operation.name}}{{ key }}">
+                {% for value in param['values'] %}
+                <div class="form-check form-check-inline">
+                  <input type="radio" name="{{ key }}"
+                         id="{{ operation.name }}-{{ key }}- {{ value }}"
+                         class="form-check-input" 
+                         value="{{ value }}">
+                  <label class="form-check-label"
+                         for="{{ operation.name }}-{{ key }}- {{ value }}">
+                    {{ value }}</label>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              Unknown parameter type.
+              {% endif %}
             </div>
             {% endfor %}
           </div>
@@ -143,6 +164,7 @@
     </div>
   </div>
 </div>
+{% endfor %}
 {% endblock %}
 
 {% block javascript %}
