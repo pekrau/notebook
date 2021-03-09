@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 import collections
 import importlib
@@ -1159,7 +1159,7 @@ def root():
 @app.route("/create", methods=["GET", "POST"])
 def create():
     """Create a new note, optionally with an uploaded file.
-    Also make a copy of an existing note.
+    Also used to create a copy of an existing note.
     """
     method = get_http_method()
 
@@ -1175,8 +1175,7 @@ def create():
         return flask.render_template(
             "create.html",
             supernote=supernote,
-            source=source,
-            upload=flask.request.values.get("upload"),
+            source=source
         )
 
     elif method == "POST":
@@ -1196,7 +1195,8 @@ def create():
         if upload:
             title, extension = os.path.splitext(upload.filename)
         else:
-            title = flask.request.form.get("title") or "No title"
+            title = "No title"
+        title = flask.request.form.get("title") or title
         text = flask.request.form.get("text") or ""
         try:
             note = supernote.create_subnote(title, text)

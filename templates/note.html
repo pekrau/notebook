@@ -87,10 +87,6 @@
 <a href="{{ url_for('create', supernote=note.path) }}"
    class="btn btn-primary btn-sm d-grid mb-1"
    title="Create a subnote for this note.">Create subnote</a>
-<a href="{{ url_for('create', supernote=note.path, upload=True) }}"
-   class="btn btn-primary btn-sm d-grid mb-1"
-   title="Upload a file into a new subnote for this note.">
-  Upload file as subnote</a>
 {% if note.is_deletable() %}
 <form action="{{ url_for('edit', path=note.path) }}"
       class="d-grid my-3"

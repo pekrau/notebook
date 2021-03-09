@@ -1,20 +1,8 @@
 {% extends 'base.html' %}
 
-{% block head_title %}
-{% if upload %}
-Upload a file into a new note
-{% else %}
-Create a new note
-{% endif %}
-{% endblock %}
+{% block head_title %}Create a new note{% endblock %}
 
-{% block body_title %}
-{% if upload %}
-Upload a file into a new note
-{% else %}
-Create a new note
-{% endif %}
-{% endblock %}
+{% block body_title %}Create a new note{% endblock %}
 
 {% block main %}
 <div class="card">
@@ -23,6 +11,7 @@ Create a new note
           enctype="multipart/form-data"
           method="POST">
       {{ get_csrf_token() }}
+
       <div class="mb-3">
         <label for="supernote" class="col-form-label">Supernote</label>
         {% if supernote %}
@@ -35,16 +24,7 @@ Create a new note
                value="<root>">
         {% endif %}
       </div>
-      {% if upload %}
-      <div class="mb-3">
-        <label for="upload" class="form-label">Upload file</label>
-        <input class="form-control" type="file" name="upload" id="upload"
-               aria-describedby="uploadHelp">
-        <div id="titleHelp" class="form-text">
-          The filename will be used as the title of the note.
-        </div>
-      </div>
-      {% else %}
+
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>
         <input type="text" name="title" id="title" autofocus
@@ -55,10 +35,20 @@ Create a new note
           Title of the new note; defines the filename of the note on disk.
         </div>
       </div>
-      {% endif %}
+
+      <div class="mb-3">
+        <label for="upload" class="form-label">Upload file</label>
+        <input class="form-control" type="file" name="upload" id="upload"
+               aria-describedby="uploadHelp">
+        <div id="titleHelp" class="form-text">
+          Optional. If no title is given above, the filename of the
+          uploaded file will be used as the title.
+        </div>
+      </div>
+
       <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
-        <textarea name="text" id="text" rows="16"
+        <textarea name="text" id="text" rows="12"
                   class="form-control"
                   aria-describedby="textHelp"
                   >{{ source and source.text or '' }}</textarea>
@@ -66,14 +56,9 @@ Create a new note
           Text of the new note in Markdown format.
         </div>
       </div>
+
       <div class="mb-3">
-        <button type="submit" class="btn btn-primary px-5">
-          {% if upload %}
-          Upload
-          {% else %}
-          Create
-          {% endif %}
-        </button>
+        <button type="submit" class="btn btn-primary px-5">Create</button>
       </div>
     </form>
   </div>
