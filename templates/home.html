@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+
 {% import 'macros.html' as macros with context %}
 
 {% block head_title %}scrapbook {{ config['SCRAPBOOK_TITLE'] }}{% endblock %}
@@ -60,7 +61,14 @@
 {% block main %}
 {{ root.text | markdown }}
 <div class="card">
-  <div class="card-header">Top level notes</div>
+  <div class="card-header">
+    Top level notes
+    <button data-bs-toggle="collapse" data-bs-target=".all-collapse"
+            class="btn btn-sm btn-outline-none py-0 my-0"
+            aria-expanded="false">
+      <span class="bi-caret-down-fill text-dark"></span>
+    </button>
+  </div>
   <div class="card-body">
     {{ macros.noteslist(root.subnotes, 3) }}
   </div>

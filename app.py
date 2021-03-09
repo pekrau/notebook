@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import collections
 import importlib
@@ -130,6 +130,10 @@ class Note:
         if term in self.text.lower():
             return True
         return False
+
+    @property
+    def id(self):
+        return f"i{id(self)}"
 
     def get_title(self):
         return self._title

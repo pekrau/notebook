@@ -7,9 +7,16 @@
   <li class="my-1">
     <div class="d-flex justify-content-start">
       {{ note_link(note, level) }}
+      {% if note.subnotes %}
+      <button data-bs-toggle="collapse" data-bs-target="#{{ note.id }}"
+              class="btn btn-sm btn-outline-none py-0 my-0"
+              aria-expanded="false" aria-controls="{{ note.id }}">
+        <span class="bi-caret-down-fill text-dark"></span>
+      </button>
+      {% endif %}
     </div>
     {% if note.subnotes %}
-    <div class="ps-5">
+    <div class="collapse all-collapse ps-5" id="{{ note.id }}">
       {{ noteslist(note.subnotes, level-1) }}
     </div>
     {% endif %}
@@ -20,13 +27,13 @@
 {% endmacro %}
 
 {% macro note_link(note, level=1) %}
-<button class="btn btn-sm btn-outline-none p-0 mx-1 clipboard"
+<button class="btn btn-sm btn-outline-none px-0 py-0 mx-1 my-0 clipboard"
         data-clipboard-text="[[{{ note.path }}]]"
         title="Copy the path of the note to the clipboard.">
   <span class="bi-clipboard text-dark"></span>
 </button>
 {{ starred(note) }}
-<a href="{{ note.url }}" class="text-decoration-none">{{ note.title }}</a>
+<a href="{{ note.url }}" class="py-0 my-0 text-decoration-none">{{ note.title }}</a>
 {{ filetype(note) }}
 {{ subnotes(note, level=level) }}
 {% endmacro %}
@@ -40,16 +47,16 @@
 {% macro filetype(note, dark=True) %}
 {% set color = dark and 'text-dark' or 'text-white' %}
 {% if note.has_image_file %}
-<span class="bi-image {{ color }} mx-1" title="{{ note.file_extension }}"></span>
+<span class="bi-image {{ color }} mx-1 my-0" title="{{ note.file_extension }}"></span>
 {% elif note.has_text_file %}
-<span class="bi-file-font {{ color }} mx-1" title="{{ note.file_extension }}"></span>
+<span class="bi-file-font {{ color }} mx-1 my-0" title="{{ note.file_extension }}"></span>
 {% elif note.has_file %}
-<span class="bi-file {{ color }} mx-1" title="{{ note.file_extension }}"></span>
+<span class="bi-file {{ color }} mx-1 my-0" title="{{ note.file_extension }}"></span>
 {% endif %}
 {% endmacro %}
 
 {% macro subnotes(note, level=1) %}
 {% if note.subnotes and level <= 1 %}
-<span class="badge bg-secondary mx-1">{{ note.count }}</span>
+<span title="Subnotes" class="badge bg-secondary rounded-pill mx-1">{{ note.count }}</span>
 {% endif %}
 {% endmacro %}

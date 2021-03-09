@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+
 {% import 'macros.html' as macros with context %}
 
 {% block head_title %}{{ note.title }}{% endblock %}
@@ -58,7 +59,14 @@
 {% endif %} {# if note.has_file #}
 {% if note.subnotes %}
 <div class="card">
-  <div class="card-header">Subnotes</div>
+  <div class="card-header">
+    Subnotes
+    <button data-bs-toggle="collapse" data-bs-target=".all-collapse"
+            class="btn btn-sm btn-outline-none py-0 my-0"
+            aria-expanded="false">
+      <span class="bi-caret-down-fill text-dark"></span>
+    </button>
+  </div>
   <div class="card-body">
     {{ macros.noteslist(note.subnotes, 3) }}
   </div>
