@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import collections
 import importlib
@@ -458,6 +458,11 @@ class Note:
             for basename in basenames:
                 note = Note(self, basename)
                 note.read()
+            # Create notes for all non-md files that are not yet attached.
+            for title, extension in self._files.items():
+                note = Note(self, title)
+                note.file_extension = extension
+                note.write()
             del self._files  # No longer needed.
         else:
             # It's a file; no subnotes.
@@ -471,7 +476,7 @@ class Note:
         if self.supernote:
             # Attached files recorded in supernote.
             try:
-                self.file_extension = self.supernote._files[self.title]
+                self.file_extension = self.supernote._files.pop(self.title)
             except KeyError:
                 pass
 
