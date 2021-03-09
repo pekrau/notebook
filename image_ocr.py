@@ -33,15 +33,19 @@ class Operation(BaseOperation):
 
     def is_relevant(self, note):
         "Is this operation relevant for the given note?"
-        if not note.file_extension: return False
+        if not note.file_extension:
+            return False
         return note.file_extension in self.EXTENSIONS
 
     def get_parameters(self, note):
         "Return the parameters required to control the operation."
-        return {"lang":
-                {"type": "select",
-                 "description": "Language used for character recognition.",
-                 "values": self.languages}}
+        return {
+            "lang": {
+                "type": "select",
+                "description": "Language used for character recognition.",
+                "values": self.languages,
+            }
+        }
 
     def execute(self, note, form):
         """Execute the operation for the given note. The form is a dictionary
@@ -54,11 +58,12 @@ class Operation(BaseOperation):
         if lang not in self.languages:
             raise ValueError(f"Unknown 'lang' parameter value: '{lang}'.")
         try:
-            text = pytesseract.image_to_string(note.abspathfile,
-                                               lang=lang,
-                                               timeout=self.timeout)
+            text = pytesseract.image_to_string(
+                note.abspathfile, lang=lang, timeout=self.timeout
+            )
             text = text.strip()
-            if not text: return
+            if not text:
+                return
         except RuntimeError:
             raise ValueError("pytesseract timeout.")
         if note.text:

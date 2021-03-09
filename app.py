@@ -17,30 +17,34 @@ import marko.ast_renderer
 import jinja2.utils
 
 
-ROOT = None           # The root note. Created in 'setup'.
-STARRED = set()       # Starred notes.
-RECENT = None         # Deque of recently modified notes. Created in 'setup'.
-BACKLINKS = dict()    # Map target note -> set of source notes.
-HASHTAGS = dict()     # Map word -> set of notes.
-ATTRIBUTES = dict()   # Map word -> map values -> set of notes.
+ROOT = None  # The root note. Created in 'setup'.
+STARRED = set()  # Starred notes.
+RECENT = None  # Deque of recently modified notes. Created in 'setup'.
+BACKLINKS = dict()  # Map target note -> set of source notes.
+HASHTAGS = dict()  # Map word -> set of notes.
+ATTRIBUTES = dict()  # Map word -> map values -> set of notes.
 
-OPERATIONS = dict()   # Map operation name -> operation object.
+OPERATIONS = dict()  # Map operation name -> operation object.
+
 
 def get_settings_filepath():
     "Get the filepath for the user's settings file."
     return os.path.join(os.path.expanduser("~/.scrapbooks"))
 
+
 def get_settings():
     "Return the settings."
-    settings = dict(VERSION = __version__,
-                    SERVER_NAME = "localhost.localdomain:5099",
-                    SECRET_KEY = "this is a secret key",
-                    DEBUG = True,
-                    JSON_AS_ASCII = False,
-                    IMAGE_EXTENSIONS = [".png",".jpg",".jpeg",".svg",".gif"],
-                    TEXT_EXTENSIONS = [".pdf", ".docx", ".txt"],
-                    MAX_RECENT = 12,
-                    SCRAPBOOKS = [])
+    settings = dict(
+        VERSION=__version__,
+        SERVER_NAME="localhost.localdomain:5099",
+        SECRET_KEY="this is a secret key",
+        DEBUG=True,
+        JSON_AS_ASCII=False,
+        IMAGE_EXTENSIONS=[".png", ".jpg", ".jpeg", ".svg", ".gif"],
+        TEXT_EXTENSIONS=[".pdf", ".docx", ".txt"],
+        MAX_RECENT=12,
+        SCRAPBOOKS=[],
+    )
     filepath = get_settings_filepath()
     try:
         with open(filepath) as infile:
@@ -49,14 +53,14 @@ def get_settings():
         pass
     settings["SETTINGS_FILEPATH"] = filepath
     # Set the bad characters for titles/filenames.
-    if platform.system() == 'Linux':
+    if platform.system() == "Linux":
         settings["BAD_CHARACTERS"] = "/\\.\n"
-    else:                       # Assume Windows; what about MacOS?
+    else:  # Assume Windows; what about MacOS?
         settings["BAD_CHARACTERS"] = '<>:"/\\|?*/.\n'
     # The first scrapbook is the starting one.
     try:
         scrapbook = settings["SCRAPBOOKS"][0]
-    except IndexError:          # No scrapbook at all.
+    except IndexError:  # No scrapbook at all.
         settings["SCRAPBOOK_DIRPATH"] = None
         settings["SCRAPBOOK_TITLE"] = None
     else:
@@ -65,6 +69,7 @@ def get_settings():
     if settings["DEBUG"]:
         settings["TEMPLATES_AUTO_RELOAD"] = True
     return settings
+
 
 def write_settings():
     """Write out the settings file with updated information.
@@ -81,11 +86,13 @@ def write_settings():
             settings[key] = flask.current_app.config[key]
         json.dump(settings, outfile, indent=2)
 
+
 def load_operations(app):
     "Load the operations modules specified in the settings."
-    for name in app.config.get('OPERATIONS', []):
+    for name in app.config.get("OPERATIONS", []):
         module = importlib.import_module(name)
         OPERATIONS[name] = module.Operation(app.config)
+
 
 def get_operations(note):
     "Get the list of operations relevant to the note."
@@ -118,8 +125,10 @@ class Note:
     def __contains__(self, term):
         "Does this note contain the search term?"
         term = term.lower()
-        if term in self.title.lower(): return True
-        if term in self.text.lower(): return True
+        if term in self.title.lower():
+            return True
+        if term in self.text.lower():
+            return True
         return False
 
     def get_title(self):
@@ -131,18 +140,26 @@ class Note:
         Raise ValueError if the title is invalid; bad start or end characters.
         Raise KeyError if there is already a note with that title
         """
-        if not self.supernote: return  # Root note has no title to change.
+        if not self.supernote:
+            return  # Root note has no title to change.
         title = cleanup_title(title)
-        if not title: raise ValueError
-        if title[0] == ".": raise ValueError
-        if title[0] == "_": raise ValueError
-        if title[-1] == "~": raise ValueError
-        if self.title == title: return
-        new_abspath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"],
-                                   self.supernote.path,
-                                   title)
-        if os.path.exists(new_abspath): raise KeyError
-        if os.path.exists(new_abspath + ".md"): raise KeyError
+        if not title:
+            raise ValueError
+        if title[0] == ".":
+            raise ValueError
+        if title[0] == "_":
+            raise ValueError
+        if title[-1] == "~":
+            raise ValueError
+        if self.title == title:
+            return
+        new_abspath = os.path.join(
+            flask.current_app.config["SCRAPBOOK_DIRPATH"], self.supernote.path, title
+        )
+        if os.path.exists(new_abspath):
+            raise KeyError
+        if os.path.exists(new_abspath + ".md"):
+            raise KeyError
         # The set of notes whose paths will change: this one and all below it.
         changing = list(self.traverse())
         # Remember the old path for each note whose paths will change.
@@ -175,8 +192,8 @@ class Note:
             text = note.text
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
-            note._text = text   # Do not add backlinks just yet.
-            note._ast = None    # Force recompile of AST.
+            note._text = text  # Do not add backlinks just yet.
+            note._ast = None  # Force recompile of AST.
             note.write(update_modified=False)
 
     title = property(get_title, set_title, doc="The title of the note.")
@@ -190,14 +207,15 @@ class Note:
         self.remove_hashtags()
         self.remove_attributes()
         self._text = text
-        self._ast = None        # Force recompile of AST.
+        self._ast = None  # Force recompile of AST.
         self.add_backlinks()
         self.add_hashtags()
         self.add_attributes()
         self.write()
 
-    text = property(get_text, set_text,
-                    doc="The text of the note using Markdown format.")
+    text = property(
+        get_text, set_text, doc="The text of the note using Markdown format."
+    )
 
     def get_modified(self):
         if self.subnotes or self is ROOT:
@@ -213,8 +231,9 @@ class Note:
         else:
             os.utime(self.abspath + ".md", (value, value))
 
-    modified = property(get_modified, set_modified,
-                        doc="The modification timestamp of the note.")
+    modified = property(
+        get_modified, set_modified, doc="The modification timestamp of the note."
+    )
 
     @property
     def ast(self):
@@ -242,8 +261,7 @@ class Note:
         "Return the absolute filepath of the note."
         path = self.path
         if path:
-            return os.path.join(
-                flask.current_app.config["SCRAPBOOK_DIRPATH"], path)
+            return os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], path)
         else:
             return flask.current_app.config["SCRAPBOOK_DIRPATH"]
 
@@ -266,18 +284,21 @@ class Note:
 
     @property
     def file_size(self):
-        if not self.has_file: return 0
+        if not self.has_file:
+            return 0
         return os.path.getsize(self.abspathfile)
 
     @property
     def has_image_file(self):
-        if not self.has_file: return False
-        return self.file_extension in flask.current_app.config['IMAGE_EXTENSIONS']
+        if not self.has_file:
+            return False
+        return self.file_extension in flask.current_app.config["IMAGE_EXTENSIONS"]
 
     @property
     def has_text_file(self):
-        if not self.has_file: return False
-        return self.file_extension in flask.current_app.config['TEXT_EXTENSIONS']
+        if not self.has_file:
+            return False
+        return self.file_extension in flask.current_app.config["TEXT_EXTENSIONS"]
 
     @property
     def count(self):
@@ -296,16 +317,18 @@ class Note:
         elif not remove:
             STARRED.add(self)
         else:
-            return              # No change; no need to update file.
-        filepath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"],
-                                "__starred__.json")
+            return  # No change; no need to update file.
+        filepath = os.path.join(
+            flask.current_app.config["SCRAPBOOK_DIRPATH"], "__starred__.json"
+        )
         with open(filepath, "w") as outfile:
             json.dump({"paths": [n.path for n in STARRED]}, outfile)
 
     def put_recent(self):
         "Put the note to the start of the list of recently modified notes."
         # Root note should not be listed.
-        if self.supernote is None: return
+        if self.supernote is None:
+            return
         self.remove_recent()
         RECENT.appendleft(self)
 
@@ -331,7 +354,7 @@ class Note:
             return []
 
     def siblings(self):
-        """Return the list of sibling notes; subnotes for 
+        """Return the list of sibling notes; subnotes for
         the supernote of this one, excluding itself.
         """
         if self.supernote:
@@ -353,7 +376,7 @@ class Note:
             abspath = os.path.join(self.abspath, "__text__.md")
             try:
                 stat = os.stat(abspath)
-            except OSError:     # Fallback to directory if no text file.
+            except OSError:  # Fallback to directory if no text file.
                 stat = os.stat(self.abspath)
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
@@ -361,7 +384,7 @@ class Note:
             abspath = self.abspath + ".md"
             try:
                 stat = os.stat(abspath)
-            except OSError:     # If the note is new, then no such file.
+            except OSError:  # If the note is new, then no such file.
                 stat = None
             with open(abspath, "w") as outfile:
                 outfile.write(self.text)
@@ -394,7 +417,8 @@ class Note:
 
     def remove_file(self):
         "Remove the attached file, if any."
-        if not self.has_file: return
+        if not self.has_file:
+            return
         os.remove(self.abspathfile)
         self.file_extension = None
 
@@ -406,21 +430,23 @@ class Note:
                 filepath = os.path.join(self.abspath, "__text__.md")
                 with open(filepath) as infile:
                     self._text = infile.read()
-            except OSError:           # No text file for directory.
+            except OSError:  # No text file for directory.
                 self._text = ""
-                 # Fallback: Use directory's timestamp!
+                # Fallback: Use directory's timestamp!
                 stat = os.stat(self.abspath)
                 # Create an empty text file.
                 filepath = os.path.join(self.abspath, "__text__.md")
                 with open(filepath, "w") as outfile:
                     outfile.write("")
                 os.utime(filepath, (stat.st_atime, stat.st_mtime))
-            self._ast = None          # Force recompile of AST.
-            self._files = {}          # Needed only during read of subnotes.
+            self._ast = None  # Force recompile of AST.
+            self._files = {}  # Needed only during read of subnotes.
             basenames = []
             for filename in sorted(os.listdir(self.abspath)):
-                if filename.startswith("_"): continue
-                if filename.endswith("~"): continue
+                if filename.startswith("_"):
+                    continue
+                if filename.endswith("~"):
+                    continue
                 basename, extension = os.path.splitext(filename)
                 # Note file; handle once directory listing is done.
                 if not extension or extension == ".md":
@@ -432,13 +458,13 @@ class Note:
             for basename in basenames:
                 note = Note(self, basename)
                 note.read()
-            del self._files     # No longer needed.
+            del self._files  # No longer needed.
         else:
             # It's a file; no subnotes.
             filepath = self.abspath + ".md"
             with open(filepath) as infile:
                 self._text = infile.read()
-                self._ast = None      # Force recompile of AST.
+                self._ast = None  # Force recompile of AST.
         # Both directory (except root) and file note may have
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
@@ -458,7 +484,7 @@ class Note:
         for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
-            except KeyError:    # Stale link.
+            except KeyError:  # Stale link.
                 self.stale_links.append(link)
             else:
                 BACKLINKS.setdefault(note, set()).add(self)
@@ -468,7 +494,7 @@ class Note:
         for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
-            except KeyError:    # Stale link.
+            except KeyError:  # Stale link.
                 try:
                     self.stale_links.remove(link)
                 except ValueError:
@@ -500,7 +526,7 @@ class Note:
         "Remove the hashtags in this note from the lookup."
         for word in self.find_hashtags(self.ast["children"]):
             HASHTAGS[word].remove(self)
-            if not HASHTAGS[word]:            # Remove if empty.
+            if not HASHTAGS[word]:  # Remove if empty.
                 HASHTAGS.pop(word)
 
     def find_hashtags(self, children):
@@ -533,7 +559,7 @@ class Note:
                 attr[value].remove(self)
                 if not attr[value]:
                     attr.pop(value)
-            if not ATTRIBUTES[word]:          # Remove if empty.
+            if not ATTRIBUTES[word]:  # Remove if empty.
                 ATTRIBUTES.pop(word)
 
     def find_attributes(self, children):
@@ -569,8 +595,9 @@ class Note:
             else:
                 break
         if title != orig_title:
-            flash_warning("The title was modified to make it unique"
-                          " among sibling notes.")
+            flash_warning(
+                "The title was modified to make it unique" " among sibling notes."
+            )
         # If this note is a file, then convert it into a directory.
         absfilepath = self.abspath + ".md"
         if os.path.isfile(absfilepath):
@@ -592,8 +619,10 @@ class Note:
             raise ValueError("Cannot move note to itself or one of its subnotes.")
         for note in supernote.subnotes:
             if self.title == note.title:
-                raise ValueError("New supernote already has a subnote"
-                                 " with the title of this note.")
+                raise ValueError(
+                    "New supernote already has a subnote"
+                    " with the title of this note."
+                )
         # Remember the old path for all notes whose paths will change.
         old_paths = [note.path for note in changing]
         # The set of notes which link to any of the changing-path notes.
@@ -609,8 +638,7 @@ class Note:
         super_absfilepath = supernote.abspath + ".md"
         if os.path.isfile(super_absfilepath):
             os.mkdir(supernote.abspath)
-            os.rename(super_absfilepath,
-                      os.path.join(supernote.abspath, "__text__.md"))
+            os.rename(super_absfilepath, os.path.join(supernote.abspath, "__text__.md"))
         # Remember old supernote.
         old_supernote = self.supernote
         # Actually set the new supernote; move the file/directory of the note.
@@ -629,8 +657,10 @@ class Note:
             os.rename(old_abspathfile, self.abspathfile)
         # Convert the old supernote to file, if no subnotes left in it.
         if len(old_supernote.subnotes) == 0:
-            os.rename(os.path.join(old_supernote.abspath, "__text__.md"),
-                      old_supernote.abspath + ".md")
+            os.rename(
+                os.path.join(old_supernote.abspath, "__text__.md"),
+                old_supernote.abspath + ".md",
+            )
             os.rmdir(old_supernote.abspath)
         # Get the new path for each note whose path was changed.
         changed_paths = zip(old_paths, [note.path for note in changing])
@@ -638,8 +668,8 @@ class Note:
             text = note.text
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
-            note._text = text   # Do not add backlinks just yet.
-            note._ast = None    # Force recompile.
+            note._text = text  # Do not add backlinks just yet.
+            note._ast = None  # Force recompile.
             note.write(update_modified=False)
         # Force the modified timestamp of the file to now.
         self.set_modified()
@@ -651,9 +681,12 @@ class Note:
         - Must have no subnotes.
         - Must have no links to it.
         """
-        if self.supernote is None: return False
-        if self.count: return False
-        if self.get_backlinks(): return False
+        if self.supernote is None:
+            return False
+        if self.count:
+            return False
+        if self.get_backlinks():
+            return False
         return True
 
     def delete(self):
@@ -674,14 +707,15 @@ class Note:
             filepath = os.path.join(abspath, "__text__.md")
             try:
                 os.rename(filepath, abspath + ".md")
-            except OSError:     # May happen if e.g. no text for dir.
+            except OSError:  # May happen if e.g. no text for dir.
                 with open(abspath + ".md", "w") as outfile:
                     outfile.write(sels.supernote.text)
             os.rmdir(abspath)
 
     def check_synced_filesystem(self):
         "When DEBUG: Check that this note is synced with its storage on disk."
-        if not flask.current_app.config["DEBUG"]: return
+        if not flask.current_app.config["DEBUG"]:
+            return
         if self.subnotes or self is ROOT:
             if not os.path.isdir(self.abspath):
                 raise RuntimeError(f"'{self}' contains subnotes but is not a directory")
@@ -723,10 +757,12 @@ class Timer:
 
 class NoteLink(marko.inline.InlineElement):
     "Link to another note."
-    pattern = r'\[\[ *(.+?) *\]\]'
+    pattern = r"\[\[ *(.+?) *\]\]"
     parse_children = False
+
     def __init__(self, match):
         self.ref = match.group(1)
+
 
 class NoteLinkRenderer:
     def render_note_link(self, element):
@@ -739,79 +775,111 @@ class NoteLinkRenderer:
             # Working link to target.
             return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
 
+
 class HashTag(marko.inline.InlineElement):
     "Hashtag in the text of a note."
-    pattern = r'#([^#].+?)\b'
+    pattern = r"#([^#].+?)\b"
     parse_children = False
+
     def __init__(self, match):
         self.word = match.group(1)
+
 
 class HashTagRenderer:
     def render_hash_tag(self, element):
         url = flask.url_for("hashtag", word=element.word)
-        return f'<a href="{url}" class="fw-bold text-decoration-none">' \
-               f'#{element.word}</a>'
+        return (
+            f'<a href="{url}" class="fw-bold text-decoration-none">'
+            f"#{element.word}</a>"
+        )
+
 
 class BareUrl(marko.inline.InlineElement):
     "A bare URL in the note text converted automatically to a link."
-    pattern = r'(https?://\S+)'
+    pattern = r"(https?://\S+)"
     parse_children = False
+
     def __init__(self, match):
         self.url = match.group(1)
+
 
 class BareUrlRenderer:
     def render_bare_url(self, element):
         return f'<a class="text-decoration-none" href="{element.url}">{element.url}</a>'
 
+
 class Attribute(marko.inline.InlineElement):
     "An attribute specified in the text of a note."
-    pattern = r'~([\w_-]+) +([^~]*)~'
+    pattern = r"~([\w_-]+) +([^~]*)~"
     parse_children = False
+
     def __init__(self, match):
         self.word = match.group(1)
         self.value = match.group(2)
 
+
 class AttributeRenderer:
     def render_attribute(self, element):
         url = flask.url_for("attribute", word=element.word)
-        return f'<a href="{url}"' \
-               ' class="fw-bold text-success text-decoration-none">' \
-               f'{element.word} {element.value}</a>'
+        return (
+            f'<a href="{url}"'
+            ' class="fw-bold text-success text-decoration-none">'
+            f"{element.word} {element.value}</a>"
+        )
+
 
 class Extensions:
     elements = [NoteLink, HashTag, BareUrl, Attribute]
-    renderer_mixins = [NoteLinkRenderer, HashTagRenderer,
-                       BareUrlRenderer, AttributeRenderer]
+    renderer_mixins = [
+        NoteLinkRenderer,
+        HashTagRenderer,
+        BareUrlRenderer,
+        AttributeRenderer,
+    ]
+
 
 class HTMLRenderer(marko.html_renderer.HTMLRenderer):
     "Fix output for Bootstrap."
 
     def render_quote(self, element):
-        return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(self.render_children(element))
+        return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(
+            self.render_children(element)
+        )
+
 
 def get_md_parser():
     "Get the extended Markdown parser for HTML."
-    return marko.Markdown(extensions=[Extensions],
-                          renderer=HTMLRenderer)
+    return marko.Markdown(extensions=[Extensions], renderer=HTMLRenderer)
+
 
 def get_md_ast_parser():
     "Get the extended Markdown parser for AST."
-    return marko.Markdown(extensions=[Extensions],
-                          renderer=marko.ast_renderer.ASTRenderer)
+    return marko.Markdown(
+        extensions=[Extensions], renderer=marko.ast_renderer.ASTRenderer
+    )
+
 
 def markdown(value):
     "Filter to process the value using augmented Marko markdown."
     return jinja2.utils.Markup(get_md_parser().convert(value or ""))
 
+
 def localtime(value):
     "Filter to convert epoch value to local time ISO string."
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(value))
 
-def flash_error(msg): flask.flash(str(msg), "error")
 
-def flash_warning(msg): flask.flash(str(msg), "warning")
+def flash_error(msg):
+    flask.flash(str(msg), "error")
 
-def flash_message(msg): flask.flash(str(msg), "message")
+
+def flash_warning(msg):
+    flask.flash(str(msg), "warning")
+
+
+def flash_message(msg):
+    flask.flash(str(msg), "message")
+
 
 def cleanup_title(title):
     "Clean up the title; remove or replace bad characters."
@@ -819,18 +887,21 @@ def cleanup_title(title):
     # - Remove some particular offensive characters.
     # - Replace some other characters with blanks.
     # - Replace with underscore those bad for the OS filesystem.
-    title = [c if c not in flask.current_app.config["BAD_CHARACTERS"]
-             else "_" for c in title]
+    title = [
+        c if c not in flask.current_app.config["BAD_CHARACTERS"] else "_" for c in title
+    ]
     # Remove or replace some particular characters.
     title = [c for c in title if c not in "\a\b\r"]
     title = [c if c not in "\t\n" else " " for c in title]
     title = "".join(title)
-    title = title.lstrip("_")         # Avoid confusion with 'scrapbooks' files.
+    title = title.lstrip("_")  # Avoid confusion with 'scrapbooks' files.
     return title.strip()
+
 
 def get_note(path):
     "Get the note given its path."
-    if not path: return ROOT
+    if not path:
+        return ROOT
     note = ROOT
     parts = list(reversed(path.split("/")))
     while parts:
@@ -843,35 +914,50 @@ def get_note(path):
             raise KeyError(f"No such note '{path}'.")
     return note
 
-def get_starred(): return sorted(STARRED)
 
-def get_recent(): return list(RECENT)
+def get_starred():
+    return sorted(STARRED)
 
-def get_hashtags(): return sorted(HASHTAGS.keys())
 
-def get_attributes(): return sorted(ATTRIBUTES.keys())
+def get_recent():
+    return list(RECENT)
+
+
+def get_hashtags():
+    return sorted(HASHTAGS.keys())
+
+
+def get_attributes():
+    return sorted(ATTRIBUTES.keys())
+
 
 def check_recent_ordered():
     "When DEBUG: Check that RECENT is ordered."
-    if not flask.current_app.config["DEBUG"]: return
+    if not flask.current_app.config["DEBUG"]:
+        return
     flask.current_app.logger.debug("checked_recent_ordered")
-    if not RECENT: return
+    if not RECENT:
+        return
     latest = RECENT[0]
     for note in RECENT:
         if note.modified > latest.modified:
             content = "\n".join([f"{localtime(n.modified)}  {n}" for n in RECENT])
             raise RuntimeError(f"RECENT out of order:\n{content}")
 
+
 def check_synced_filesystem():
     "When DEBUG: Check that all notes in memory exist as files/directories."
-    if not flask.current_app.config["DEBUG"]: return
+    if not flask.current_app.config["DEBUG"]:
+        return
     flask.current_app.logger.debug("checked_synced_filesystem")
     for note in ROOT.traverse():
         note.check_synced_filesystem()
 
+
 def check_synced_memory():
     "When DEBUG: Check that files/directories exist as notes in memory."
-    if not flask.current_app.config["DEBUG"]: return
+    if not flask.current_app.config["DEBUG"]:
+        return
     flask.current_app.logger.debug("checked_synced_memory")
     root = flask.current_app.config["SCRAPBOOK_DIRPATH"]
     try:
@@ -885,7 +971,7 @@ def check_synced_memory():
     for dirpath, dirnames, filenames in os.walk(root):
         for dirname in dirnames:
             abspath = os.path.join(dirpath, dirname)
-            path = abspath[len(root)+1:]
+            path = abspath[len(root) + 1 :]
             try:
                 note = get_note(path)
             except KeyError:
@@ -900,12 +986,13 @@ def check_synced_memory():
                 text = ""
             if text != note.text:
                 raise RuntimeError(f"file {textabspath} text differs from '{note}'")
-                
+
         for filename in filenames:
             abspath = os.path.join(dirpath, filename)
             basename, ext = os.path.splitext(filename)
-            if basename.startswith("_"): continue
-            path = os.path.join(dirpath, basename)[len(root)+1:]
+            if basename.startswith("_"):
+                continue
+            path = os.path.join(dirpath, basename)[len(root) + 1 :]
             if ext == ".md":
                 try:
                     note = get_note(path)
@@ -921,24 +1008,30 @@ def check_synced_memory():
                 except KeyError:
                     raise RuntimeError(f"No note '{path}' for non-md file {abspath}")
                 if ext != note.file_extension:
-                    raise RuntimeError(f"Non-md file {abspath} extension"
-                                       f" does not match '{note}'")
+                    raise RuntimeError(
+                        f"Non-md file {abspath} extension" f" does not match '{note}'"
+                    )
+
 
 def get_csrf_token():
     "Output HTML for cross-site request forgery (CSRF) protection."
     # Generate a token to last the session's lifetime.
-    if '_csrf_token' not in flask.session:
-        flask.session['_csrf_token'] = uuid.uuid4().hex
-    html = '<input type="hidden" name="_csrf_token" value="%s">' % \
-           flask.session['_csrf_token']
+    if "_csrf_token" not in flask.session:
+        flask.session["_csrf_token"] = uuid.uuid4().hex
+    html = (
+        '<input type="hidden" name="_csrf_token" value="%s">'
+        % flask.session["_csrf_token"]
+    )
     return jinja2.utils.Markup(html)
+
 
 def check_csrf_token():
     "Check the CSRF token for POST HTML."
     # Do not use up the token; keep it for the session's lifetime.
-    token = flask.session.get('_csrf_token', None)
-    if not token or token != flask.request.form.get('_csrf_token'):
+    token = flask.session.get("_csrf_token", None)
+    if not token or token != flask.request.form.get("_csrf_token"):
         flask.abort(http.client.BAD_REQUEST)
+
 
 def get_http_method():
     "Return the HTTP request method, taking tunneling into account."
@@ -957,6 +1050,7 @@ app = flask.Flask(__name__)
 app.add_template_filter(markdown)
 app.add_template_filter(localtime)
 
+
 @app.before_first_request
 def setup():
     """Read all notes and keep in memory. Set up:
@@ -974,20 +1068,24 @@ def setup():
     ATTRIBUTES.clear()
     ROOT = Note(None, None)
     # Nothing more to do if no scrapbooks.
-    if not flask.current_app.config["SCRAPBOOK_DIRPATH"]: return
+    if not flask.current_app.config["SCRAPBOOK_DIRPATH"]:
+        return
     # Read in all notes.
     ROOT.read()
     # Set up most recently modified notes.
     traverser = ROOT.traverse()
-    next(traverser)             # Skip root note.
+    next(traverser)  # Skip root note.
     notes = list(traverser)
     notes.sort(key=lambda n: n.modified, reverse=True)
-    RECENT = collections.deque(notes[:flask.current_app.config["MAX_RECENT"]],
-                               maxlen=flask.current_app.config["MAX_RECENT"])
+    RECENT = collections.deque(
+        notes[: flask.current_app.config["MAX_RECENT"]],
+        maxlen=flask.current_app.config["MAX_RECENT"],
+    )
     # Get the starred notes.
     try:
-        filepath = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], 
-                                "__starred__.json")
+        filepath = os.path.join(
+            flask.current_app.config["SCRAPBOOK_DIRPATH"], "__starred__.json"
+        )
         with open(filepath) as infile:
             for path in json.load(infile)["paths"]:
                 try:
@@ -1010,19 +1108,23 @@ def setup():
         for value, notes in values.items():
             print("  ", value, notes)
 
+
 @app.context_processor
 def setup_template_context():
     "Add to the global context of Jinja2 templates."
-    return dict(interactive=True,
-                flash_error=flash_error,
-                flash_warning=flash_warning,
-                flash_message=flash_message,
-                get_operations=get_operations,
-                get_csrf_token=get_csrf_token,
-                get_starred=get_starred,
-                get_recent=get_recent,
-                get_hashtags=get_hashtags,
-                get_attributes=get_attributes)
+    return dict(
+        interactive=True,
+        flash_error=flash_error,
+        flash_warning=flash_warning,
+        flash_message=flash_message,
+        get_operations=get_operations,
+        get_csrf_token=get_csrf_token,
+        get_starred=get_starred,
+        get_recent=get_recent,
+        get_hashtags=get_hashtags,
+        get_attributes=get_attributes,
+    )
+
 
 @app.route("/")
 def home():
@@ -1030,18 +1132,20 @@ def home():
     if not flask.current_app.config["SCRAPBOOK_DIRPATH"]:
         return flask.redirect(flask.url_for("scrapbook"))
     n_links = sum([len(s) for s in BACKLINKS.values()])
-    scrapbooks = [(os.path.basename(n), n) 
-                 for n in flask.current_app.config["SCRAPBOOKS"]]
-    return flask.render_template("home.html", 
-                                 root=ROOT,
-                                 n_links=n_links,
-                                 scrapbooks=scrapbooks)
+    scrapbooks = [
+        (os.path.basename(n), n) for n in flask.current_app.config["SCRAPBOOKS"]
+    ]
+    return flask.render_template(
+        "home.html", root=ROOT, n_links=n_links, scrapbooks=scrapbooks
+    )
+
 
 @app.route("/note")
 @app.route("/note/")
 def root():
     "Root note of the current scrapbook; redirect to home."
     return flask.redirect(flask.url_for("home"))
+
 
 @app.route("/create", methods=["GET", "POST"])
 def create():
@@ -1054,20 +1158,23 @@ def create():
         try:
             supernote = get_note(flask.request.values["supernote"])
         except KeyError:
-            supernote = None    # Root supernote.
+            supernote = None  # Root supernote.
         try:
             source = get_note(flask.request.values["source"])
         except KeyError:
             source = None
-        return flask.render_template("create.html",
-                                     supernote=supernote,
-                                     source=source,
-                                     upload=flask.request.values.get("upload"))
+        return flask.render_template(
+            "create.html",
+            supernote=supernote,
+            source=source,
+            upload=flask.request.values.get("upload"),
+        )
 
     elif method == "POST":
         try:
             superpath = flask.request.form["supernote"]
-            if not superpath: raise KeyError
+            if not superpath:
+                raise KeyError
         except KeyError:
             supernote = ROOT
         else:
@@ -1094,6 +1201,7 @@ def create():
         check_synced_memory()
         return flask.redirect(note.url)
 
+
 @app.route("/note/<path:path>")
 def note(path):
     "Display page for the given note."
@@ -1103,6 +1211,7 @@ def note(path):
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     return flask.render_template("note.html", note=note)
+
 
 @app.route("/file/<path:path>")
 def file(path):
@@ -1115,11 +1224,10 @@ def file(path):
     if not note.has_file:
         raise KeyError(f"No file attached to note '{path}'")
     if flask.request.values.get("download"):
-        return flask.send_file(note.abspathfile,
-                               conditional=False,
-                               as_attachment=True)
+        return flask.send_file(note.abspathfile, conditional=False, as_attachment=True)
     else:
         return flask.send_file(note.abspathfile, conditional=False)
+
 
 @app.route("/edit/", methods=["GET", "POST"])
 @app.route("/edit/<path:path>", methods=["GET", "POST", "DELETE"])
@@ -1132,8 +1240,7 @@ def edit(path=""):
             note = ROOT
         else:
             flash_error(f"No such note: '{path}'")
-            return flask.redirect(
-                flask.url_for("note", path=os.path.dirname(path)))
+            return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
 
     method = get_http_method()
 
@@ -1158,8 +1265,7 @@ def edit(path=""):
         else:
             upload = flask.request.files.get("upload")
             if upload:
-                note.upload_file(upload.read(),
-                                 os.path.splitext(upload.filename)[1])      
+                note.upload_file(upload.read(), os.path.splitext(upload.filename)[1])
         note.put_recent()
         if note.stale_links:
             flash_warning("Note text contains stale links.")
@@ -1184,9 +1290,10 @@ def edit(path=""):
         check_synced_memory()
         return flask.redirect(note.supernote.url)
 
+
 @app.route("/op/<name>/<path:path>", methods=["POST"])
 def operation(name, path):
-    get_http_method()           # Does CSRF check.
+    get_http_method()  # Does CSRF check.
     try:
         note = get_note(path)
     except KeyError:
@@ -1244,10 +1351,11 @@ def move(path):
         check_synced_memory()
         return flask.redirect(note.url)
 
+
 @app.route("/star/<path:path>", methods=["POST"])
 def star(path):
     "Toggle the star state of the note for the path."
-    get_http_method()           # Does CSRF check.
+    get_http_method()  # Does CSRF check.
     try:
         note = get_note(path)
     except KeyError:
@@ -1256,44 +1364,49 @@ def star(path):
     note.star()
     return flask.redirect(note.url)
 
+
 @app.route("/hashtag/<word>")
 def hashtag(word):
-    return flask.render_template("hashtag.html",
-                                 word=word,
-                                 notes=sorted(HASHTAGS.get(word, list())))
+    return flask.render_template(
+        "hashtag.html", word=word, notes=sorted(HASHTAGS.get(word, list()))
+    )
+
 
 @app.route("/attribute/<word>")
 def attribute(word):
-    values = sorted([(k, sorted(v)) for k, v in
-                     ATTRIBUTES.get(word, dict()).items()])
+    values = sorted([(k, sorted(v)) for k, v in ATTRIBUTES.get(word, dict()).items()])
     return flask.render_template("attribute.html", word=word, values=values)
+
 
 @app.route("/search")
 def search():
     terms = flask.request.values.get("terms") or ""
     if terms:
         terms = terms.strip()
-        if (terms[0] == '"' and terms[-1] == '"') or \
-           (terms[0] == "'" and terms[-1] == "'"):
-            terms = [terms[1:-1]]   # Quoted term; search as a whole
+        if (terms[0] == '"' and terms[-1] == '"') or (
+            terms[0] == "'" and terms[-1] == "'"
+        ):
+            terms = [terms[1:-1]]  # Quoted term; search as a whole
         else:
             terms = terms.split()
         terms.sort(key=lambda t: len(t), reverse=True)
         notes = []
         traverser = ROOT.traverse()
-        next(traverser)             # Skip root note.
+        next(traverser)  # Skip root note.
         timer = Timer()
         for note in traverser:
             for term in terms:
-                if term not in note: break
+                if term not in note:
+                    break
             else:
                 notes.append(note)
         flash_message(f"Search {timer}")
     else:
         notes = []
-    return flask.render_template("search.html",
-                                 notes=sorted(notes),
-                                 terms=flask.request.values.get("terms"))
+    return flask.render_template(
+        "search.html", notes=sorted(notes), terms=flask.request.values.get("terms")
+    )
+
 
 @app.route("/scrapbook", methods=["GET", "POST", "DELETE"])
 def scrapbook():
@@ -1307,7 +1420,8 @@ def scrapbook():
         try:
             try:
                 dirpath = flask.request.form["scrapbook"]
-                if not dirpath: raise KeyError
+                if not dirpath:
+                    raise KeyError
             except KeyError:
                 raise ValueError("No path given.")
             dirpath = os.path.expanduser(dirpath)
@@ -1320,8 +1434,7 @@ def scrapbook():
                 pass
             # Directory exists; add it as a scrapbook and go to it.
             elif os.path.isdir(dirpath):
-                if not (os.access(dirpath, os.R_OK) and 
-                        os.access(dirpath, os.W_OK)):
+                if not (os.access(dirpath, os.R_OK) and os.access(dirpath, os.W_OK)):
                     raise ValueError(f"No read/write access to '{dirpath}'")
                 else:
                     flask.current_app.config["SCRAPBOOKS"].append(dirpath)
@@ -1335,8 +1448,9 @@ def scrapbook():
                     os.mkdir(dirpath)
                 except OSError as error:
                     raise ValueError(str(error))
-                flash_message("Added scrapbook and created"
-                              f" the directory '{dirpath}'")
+                flash_message(
+                    "Added scrapbook and created" f" the directory '{dirpath}'"
+                )
                 flask.current_app.config["SCRAPBOOKS"].append(dirpath)
                 write_settings()
         except ValueError as error:
@@ -1357,15 +1471,18 @@ def scrapbook():
         else:
             return change_scrapbook(scrapbook)
 
+
 @app.route("/scrapbook/<title>")
 def switch_scrapbook(title):
     "Switch to another scrapbook. Yes, using GET for this is arguably bad."
     for scrapbook in flask.current_app.config["SCRAPBOOKS"]:
-        if title == os.path.basename(scrapbook): break
+        if title == os.path.basename(scrapbook):
+            break
     else:
         flash_error(f"No such scrapbook '{title}'.")
         return flask.redirect(flask.url_for("home"))
     return change_scrapbook(scrapbook)
+
 
 def change_scrapbook(scrapbook):
     "Change to the given scrapbook."

@@ -2,6 +2,7 @@
 
 
 class BaseOperation:
+    "Abstract base class for operation."
 
     def __init__(self, config):
         pass
