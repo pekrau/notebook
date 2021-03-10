@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 import collections
 import importlib
@@ -830,14 +830,16 @@ class Attribute(marko.inline.InlineElement):
 class AttributeRenderer:
     def render_attribute(self, element):
         key_url = flask.url_for("attribute", key=element.key)
-        value_url = flask.url_for("attribute_value", key=element.key, value=element.value)
+        value_url = flask.url_for(
+            "attribute_value", key=element.key, value=element.value
+        )
         return (
             f'<a href="{key_url}"'
             ' class="fw-bold text-success text-decoration-none">'
-            f'{element.key}:</a>'
+            f"{element.key}:</a>"
             f' <a href="{value_url}"'
             'class="text-success text-decoration-none">'
-            f'{element.value}</a>'
+            f"{element.value}</a>"
         )
 
 
@@ -1176,11 +1178,7 @@ def create():
             source = get_note(flask.request.values["source"])
         except KeyError:
             source = None
-        return flask.render_template(
-            "create.html",
-            supernote=supernote,
-            source=source
-        )
+        return flask.render_template("create.html", supernote=supernote, source=source)
 
     elif method == "POST":
         try:
@@ -1387,14 +1385,12 @@ def attribute(key):
     values = sorted([(k, sorted(v)) for k, v in ATTRIBUTES.get(key, dict()).items()])
     return flask.render_template("attribute.html", key=key, values=values)
 
+
 @app.route("/attribute/<key>/<path:value>")
 def attribute_value(key, value):
     notes = sorted(ATTRIBUTES.get(key, dict()).get(value))
     return flask.render_template(
-        "attribute_value.html",
-        key=key,
-        value=value,
-        notes=notes
+        "attribute_value.html", key=key, value=value, notes=notes
     )
 
 

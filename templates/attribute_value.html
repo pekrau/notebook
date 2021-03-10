@@ -2,6 +2,10 @@
 
 {% import 'macros.html' as macros with context %}
 
+{% block css %}
+{% include 'datatables-css.html' %}
+{% endblock %}
+
 {% block head_title %}Attribute {{ key }}: {{ value }}{% endblock %}
 {% block body_title %}
 <span class="text-muted">Attribute</span>
@@ -10,7 +14,7 @@
 
 {% block left_main %}
 <div class="col-md-10">
-  <table class="table table-sm table-hover table-responsive">
+  <table id="notes" class="table table-sm table-hover table-responsive">
     <thead>
       <tr>
         <th width="30%"></th>
@@ -43,3 +47,15 @@
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
 {% endblock %} {# block right #}
+
+{% block javascript %}
+{% include 'datatables-js.html' %}
+<script>
+  $(document).ready(function() {
+    $('#notes').DataTable({
+      "lengthMenu": [10, 20, 40, 60, 80, 100],
+      "pageLength": 20
+    });
+  } );
+</script>
+{% endblock %} {#% block javascript #}

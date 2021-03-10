@@ -2,6 +2,10 @@
 
 {% import 'macros.html' as macros with context %}
 
+{% block css %}
+{% include 'datatables-css.html' %}
+{% endblock %}
+
 {% block head_title %}Attribute {{ key }}{% endblock %}
 {% block body_title %}
 <span class="text-muted">Attribute</span>
@@ -10,11 +14,11 @@
 
 {% block left_main %}
 <div class="col-md-10">
-  <table class="table table-sm table-hover table-responsive">
+  <table id="notes" class="table table-sm table-hover table-responsive">
     <thead>
       <tr>
         <th width="20%">Value</th>
-        <th width="20%"></th>
+        <th width="20%">Supernote</th>
         <th width="40%">Note</th>
         <th width="20%">Modified</th>
       </tr>
@@ -23,10 +27,14 @@
     {% for value, notes in values %}
     {% for note in notes %}
     <tr>
-      <td>{{ value }}</td>
+      <td>
+        <a href="{{ url_for('attribute_value', key=key, value=value) }}"
+           class="py-0 my-0 text-decoration-none">{{ value }}</a>
+      </td>
       <td class="text-end">
         {% if note.supernote.path %}
-        {{ note.supernote.path }}/
+        <a href="{{ note.supernote.url }}"
+           class="py-0 my-0 text-decoration-none">{{ note.supernote.path }}</a>
         {% endif %}
       </td>
       <td>
@@ -47,3 +55,15 @@
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
 {% endblock %} {# block right #}
+
+{% block javascript %}
+{% include 'datatables-js.html' %}
+<script>
+  $(document).ready(function() {
+    $('#notes').DataTable({
+      "lengthMenu": [10, 20, 40, 60, 80, 100],
+      "pageLength": 20
+    });
+  } );
+</script>
+{% endblock %} {#% block javascript #}
