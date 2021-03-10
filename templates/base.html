@@ -51,10 +51,10 @@
                  class="nav-link dropdown-toggle me-3"
                  aria-expanded="false">Attributes</a>
               <ul class="dropdown-menu" aria-labelledby="attributesDropdown">
-                {% for word in get_attributes() %}
+                {% for key in get_attributes() %}
                 <li>
-                  <a href="{{ url_for('attribute', word=word) }}"
-                     class="dropdown-item">{{ word }}</a>
+                  <a href="{{ url_for('attribute', key=key) }}"
+                     class="dropdown-item">{{ key }}</a>
                 </li>
                 {% endfor %}
               </ul>

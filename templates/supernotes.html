@@ -1,4 +1,7 @@
 {# List of supernotes #}
+
+{% import 'macros.html' as macros with context %}
+
 <div class="card bg-light mb-3">
   <div class="card-header py-1">Supernotes</div>
   <div class="card-body p-1">
@@ -8,12 +11,7 @@
     </div>
     {% for supernote in note.supernotes()[1:] %}
     <div class="d-flex align-items-start mb-1">
-      <button class="btn btn-sm btn-outline-none p-0 mx-2 clipboard"
-              data-clipboard-text="[[{{ supernote.path }}]]"
-              title="Copy the path of the note to the clipboard.">
-        <span class="bi-clipboard text-dark"></span>
-        / <a href="{{ supernote.url }}"
-             class="text-decoration-none">{{ supernote.title }}</a>
+      {{ macros.note_link(supernote, level=0) }}
     </div>
     {% endfor %}
   </div>

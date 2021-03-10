@@ -2,10 +2,10 @@
 
 {% import 'macros.html' as macros with context %}
 
-{% block head_title %}Attribute {{ key }}{% endblock %}
+{% block head_title %}Attribute {{ key }}: {{ value }}{% endblock %}
 {% block body_title %}
 <span class="text-muted">Attribute</span>
-<span class="text-success">{{ key }}</span>
+<span class="text-success">{{ key }}: {{ value }}</span>
 {% endblock %}
 
 {% block left_main %}
@@ -13,17 +13,14 @@
   <table class="table table-sm table-hover table-responsive">
     <thead>
       <tr>
-        <th width="20%">Value</th>
-        <th width="20%"></th>
-        <th width="40%">Note</th>
+        <th width="30%"></th>
+        <th width="50%">Note</th>
         <th width="20%">Modified</th>
       </tr>
     </thead>
     <tbody>
-    {% for value, notes in values %}
     {% for note in notes %}
     <tr>
-      <td>{{ value }}</td>
       <td class="text-end">
         {% if note.supernote.path %}
         {{ note.supernote.path }}/
@@ -35,7 +32,6 @@
       <td class="small">{{ note.modified | localtime }}</td>
     </tr>
     {% endfor %} {# for note in notes #}
-    {% endfor %} {# for value in values #}
   </tbody>
 </table>
 </div>

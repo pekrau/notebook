@@ -52,9 +52,9 @@
 </div>
 {% endif %} {# if note.has_image_file #}
 {% if note.has_file %}
-<a href="{{ url_for('file', path=note.path, download=True) }}"
+<a href="{{ url_for('file', path=note.path) }}" target="_blank"
    class="btn btn-primary my-lg-2">
-  Download {{ note.file_extension }} file {{ note.file_size | filesizeformat }}
+  {{ note.file_extension }} file ({{ note.file_size | filesizeformat }})
 </a>
 {% endif %} {# if note.has_file #}
 {% if note.subnotes %}

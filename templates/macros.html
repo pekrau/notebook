@@ -56,7 +56,7 @@
 {% endmacro %}
 
 {% macro subnotes(note, level=1) %}
-{% if note.subnotes and level <= 1 %}
+{% if note.subnotes and level >= 1 %}
 <span title="Subnotes" class="badge bg-secondary rounded-pill mx-1">{{ note.count }}</span>
 {% endif %}
 {% endmacro %}

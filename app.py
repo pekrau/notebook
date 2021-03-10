@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.3"
+__version__ = "1.0.5"
 
 import collections
 import importlib
@@ -555,31 +555,31 @@ class Note:
 
     def add_attributes(self):
         "Add the attributes in this note to the lookup."
-        for word, values in self.find_attributes(self.ast["children"]).items():
-            attribute = ATTRIBUTES.setdefault(word, dict())
+        for key, values in self.find_attributes(self.ast["children"]).items():
+            attribute = ATTRIBUTES.setdefault(key, dict())
             for value in values:
                 attribute.setdefault(value, set()).add(self)
 
     def remove_attributes(self):
         "Remove the attributes in this note from the lookup."
-        for word, values in self.find_attributes(self.ast["children"]).items():
-            attr = ATTRIBUTES[word]
+        for key, values in self.find_attributes(self.ast["children"]).items():
+            attr = ATTRIBUTES[key]
             for value in values:
                 attr[value].remove(self)
                 if not attr[value]:
                     attr.pop(value)
-            if not ATTRIBUTES[word]:  # Remove if empty.
-                ATTRIBUTES.pop(word)
+            if not ATTRIBUTES[key]:  # Remove if empty.
+                ATTRIBUTES.pop(key)
 
     def find_attributes(self, children):
         """Find the attributes in the children of the AST tree.
-        Return the lookup of words to values.
+        Return the lookup of keys to values.
         """
         result = dict()
         if isinstance(children, list):
             for child in children:
                 if child.get("element") == "attribute":
-                    attr = result.setdefault(child["word"], set())
+                    attr = result.setdefault(child["key"], set())
                     attr.add(child["value"])
                 try:
                     attrs = self.find_attributes(child["children"])
@@ -819,21 +819,25 @@ class BareUrlRenderer:
 
 class Attribute(marko.inline.InlineElement):
     "An attribute specified in the text of a note."
-    pattern = r"~([\w_-]+) +([^~]*)~"
+    pattern = r"{([^:]+):\s*([^}]*)}"
     parse_children = False
 
     def __init__(self, match):
-        self.word = match.group(1)
+        self.key = match.group(1)
         self.value = match.group(2)
 
 
 class AttributeRenderer:
     def render_attribute(self, element):
-        url = flask.url_for("attribute", word=element.word)
+        key_url = flask.url_for("attribute", key=element.key)
+        value_url = flask.url_for("attribute_value", key=element.key, value=element.value)
         return (
-            f'<a href="{url}"'
+            f'<a href="{key_url}"'
             ' class="fw-bold text-success text-decoration-none">'
-            f"{element.word} {element.value}</a>"
+            f'{element.key}:</a>'
+            f' <a href="{value_url}"'
+            'class="text-success text-decoration-none">'
+            f'{element.value}</a>'
         )
 
 
@@ -1112,8 +1116,8 @@ def setup():
     check_synced_filesystem()
     check_synced_memory()
     flash_message(f"Setup {timer}")
-    for word, values in ATTRIBUTES.items():
-        print(word)
+    for key, values in ATTRIBUTES.items():
+        print(key)
         for value, notes in values.items():
             print("  ", value, notes)
 
@@ -1224,7 +1228,7 @@ def note(path):
 
 @app.route("/file/<path:path>")
 def file(path):
-    "Return the file for the given note. Optionally for download."
+    "Return the file for the given note."
     try:
         note = get_note(path)
     except KeyError:
@@ -1232,10 +1236,7 @@ def file(path):
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
     if not note.has_file:
         raise KeyError(f"No file attached to note '{path}'")
-    if flask.request.values.get("download"):
-        return flask.send_file(note.abspathfile, conditional=False, as_attachment=True)
-    else:
-        return flask.send_file(note.abspathfile, conditional=False)
+    return flask.send_file(note.abspathfile, conditional=False)
 
 
 @app.route("/edit/", methods=["GET", "POST"])
@@ -1381,10 +1382,20 @@ def hashtag(word):
     )
 
 
-@app.route("/attribute/<word>")
-def attribute(word):
-    values = sorted([(k, sorted(v)) for k, v in ATTRIBUTES.get(word, dict()).items()])
-    return flask.render_template("attribute.html", word=word, values=values)
+@app.route("/attribute/<key>")
+def attribute(key):
+    values = sorted([(k, sorted(v)) for k, v in ATTRIBUTES.get(key, dict()).items()])
+    return flask.render_template("attribute.html", key=key, values=values)
+
+@app.route("/attribute/<key>/<path:value>")
+def attribute_value(key, value):
+    notes = sorted(ATTRIBUTES.get(key, dict()).get(value))
+    return flask.render_template(
+        "attribute_value.html",
+        key=key,
+        value=value,
+        notes=notes
+    )
 
 
 @app.route("/search")
