@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 
 import collections
 import importlib
@@ -554,19 +554,27 @@ class Note:
         return result
 
     def add_attributes(self):
-        "Add the attributes in this note to the lookup."
-        for key, values in self.find_attributes(self.ast["children"]).items():
-            attribute = ATTRIBUTES.setdefault(key, dict())
+        """Add the attributes in this note to the lookup.
+        Includes the hard-wired attribute 'File' when present.
+        """
+        attributes = list(self.find_attributes(self.ast["children"]).items())
+        if self.file_extension:
+            attributes.append(("File", [self.file_extension.strip(".")]))
+        for key, values in attributes:
+            attr = ATTRIBUTES.setdefault(key, dict())
             for value in values:
-                attribute.setdefault(value, set()).add(self)
+                attr.setdefault(value, set()).add(self)
 
     def remove_attributes(self):
         "Remove the attributes in this note from the lookup."
-        for key, values in self.find_attributes(self.ast["children"]).items():
+        attributes = self.find_attributes(self.ast["children"]).items()
+        if self.file_extension:
+            attributes.append(("File", [self.file_extension.strip(".")]))
+        for key, values in attributes:
             attr = ATTRIBUTES[key]
             for value in values:
                 attr[value].remove(self)
-                if not attr[value]:
+                if not attr[value]:  # Remove if empty.
                     attr.pop(value)
             if not ATTRIBUTES[key]:  # Remove if empty.
                 ATTRIBUTES.pop(key)
@@ -819,12 +827,12 @@ class BareUrlRenderer:
 
 class Attribute(marko.inline.InlineElement):
     "An attribute specified in the text of a note."
-    pattern = r"{([^:]+):\s*([^}]*)}"
+    pattern = r"{([^:]+):([^}]*)}"
     parse_children = False
 
     def __init__(self, match):
-        self.key = match.group(1)
-        self.value = match.group(2)
+        self.key = match.group(1).strip()
+        self.value = match.group(2).strip()
 
 
 class AttributeRenderer:
