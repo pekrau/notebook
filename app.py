@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 import collections
 import importlib
@@ -560,6 +560,7 @@ class Note:
         attributes = list(self.find_attributes(self.ast["children"]).items())
         if self.file_extension:
             attributes.append(("File", [self.file_extension.strip(".")]))
+            attributes.append(("File size", [self.file_size]))
         for key, values in attributes:
             attr = ATTRIBUTES.setdefault(key, dict())
             for value in values:
@@ -567,9 +568,10 @@ class Note:
 
     def remove_attributes(self):
         "Remove the attributes in this note from the lookup."
-        attributes = self.find_attributes(self.ast["children"]).items()
+        attributes = list(self.find_attributes(self.ast["children"]).items())
         if self.file_extension:
             attributes.append(("File", [self.file_extension.strip(".")]))
+            attributes.append(("File size", [self.file_size]))
         for key, values in attributes:
             attr = ATTRIBUTES[key]
             for value in values:
