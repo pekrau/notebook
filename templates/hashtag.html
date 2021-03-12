@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block css %}
+{% include 'datatables-css.html' %}
+{% endblock %}
+
 {% block head_title %}Hashtag {{ word }}{% endblock %}
 {% block body_title %}
 <span class="text-muted">Hashtag</span>
@@ -22,3 +26,7 @@
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
 {% endblock %} {# block right #}
+
+{% block javascript %}
+{% include 'datatables-js.html' %}
+{% endblock %}

@@ -1,5 +1,13 @@
-{# DataTables Javascript links to be included. #}
+{# DataTables Javascript links to be included; setup of table. #}
 
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  $(document).ready(function() {
+    $('#notes').DataTable({
+      "lengthMenu": [10, 20, 40, 60, 80, 100],
+      "pageLength": 20
+    });
+  } );
+</script>

@@ -39,6 +39,14 @@
 {% endblock %} {# block left #}
 
 {% block main %}
+{% if note.has_file %}
+<a href="{{ url_for('file', path=note.path) }}" target="_blank"
+   role="button" class="btn btn-dark px-5 mb-3"
+   title="Download the attached file.">
+  {{ note.file_extension.strip('.') }} ({{ note.file_size | filesizeformat }})
+</a>
+{% endif %} {# if note.has_file #}
+
 {{ note['text'] | markdown }}
 
 {% if note.has_image_file %}
@@ -71,14 +79,6 @@
 {% endblock %} {# block main #}
 
 {% block right %}
-{% if note.has_file %}
-<a href="{{ url_for('file', path=note.path) }}" target="_blank"
-   role="button" class="btn btn-dark d-grid mb-3"
-   title="Download the attached file.">
-  <strong>{{ note.file_extension.strip('.') }}</strong>
-  {{ note.file_size | filesizeformat }}
-</a>
-{% endif %} {# if note.has_file #}
 <a href="{{ url_for('edit', path=note.path) }}"
    role="button" class="btn btn-primary d-grid mb-3"
    title="Edit the titel and/or text of this note.">Edit</a>

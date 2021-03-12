@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
 import collections
 import importlib
@@ -489,7 +489,7 @@ class Note:
         return sorted(BACKLINKS.get(self, list()))
 
     def add_backlinks(self):
-        "Add the links to other notes in this note to the lookup."
+        "Add to the lookup the links in this note to other notes."
         for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
@@ -499,7 +499,7 @@ class Note:
                 BACKLINKS.setdefault(note, set()).add(self)
 
     def remove_backlinks(self):
-        "Remove the links to other notes in this note from the lookup."
+        "Remove from the lookup the links in this note to other notes."
         for link in self.find_links(self.ast["children"]):
             try:
                 note = get_note(link)
@@ -789,9 +789,17 @@ class NoteLinkRenderer:
             note = get_note(element.ref)
         except KeyError:
             # Stale link; target does not exist.
-            return f'<span class="text-danger">[[{element.ref}]]</span>'
+            try:
+                supernote, title = element.ref.rsplit("/", 1)
+            except ValueError:
+                supernote = None
+                title = element.ref
+            url = flask.url_for("create", supernote=supernote, title=title)
+            return f' <a href="{url}" class="text-danger"' \
+                ' title="Create a note for this stale link.">' \
+                f'[[{element.ref}]]</a>'
         else:
-            # Working link to target.
+            # Link to target.
             return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
 
 
@@ -1128,10 +1136,6 @@ def setup():
     check_synced_filesystem()
     check_synced_memory()
     flash_message(f"Setup {timer}")
-    for key, values in ATTRIBUTES.items():
-        print(key)
-        for value, notes in values.items():
-            print("  ", value, notes)
 
 
 @app.context_processor
@@ -1186,9 +1190,22 @@ def create():
             supernote = None  # Root supernote.
         try:
             source = get_note(flask.request.values["source"])
+            title = f"Copy of {source.title}"
+            text = source.text
         except KeyError:
             source = None
-        return flask.render_template("create.html", supernote=supernote, source=source)
+            text = None
+            try:
+                title = flask.request.values["title"]
+            except KeyError:
+                title = None
+        return flask.render_template(
+            "create.html",
+            supernote=supernote,
+            title=title,
+            text=text,
+            cancel_url=flask.request.headers.get('referer')
+        )
 
     elif method == "POST":
         try:
@@ -1217,6 +1234,13 @@ def create():
         except ValueError as error:
             flash_error(error)
             return flask.redirect(supernote.url)
+        # Fix any stale links in other notes to this one.
+        path = note.path
+        for other in ROOT.traverse():
+            if path in other.stale_links:
+                print(f"fixing stale link '{path}'")
+                BACKLINKS.setdefault(note, set()).add(other)
+                other.stale_links.remove(path)
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()
@@ -1231,6 +1255,7 @@ def note(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
+    print("stale links", note.stale_links)
     return flask.render_template("note.html", note=note)
 
 
@@ -1286,7 +1311,7 @@ def edit(path=""):
                 note.upload_file(upload.read(), os.path.splitext(upload.filename)[1])
         note.put_recent()
         if note.stale_links:
-            flash_warning("Note text contains stale links.")
+            flash_warning("There are stale links in this note.")
         check_recent_ordered()
         check_synced_filesystem()
         check_synced_memory()
