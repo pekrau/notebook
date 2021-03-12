@@ -1238,7 +1238,6 @@ def create():
         path = note.path
         for other in ROOT.traverse():
             if path in other.stale_links:
-                print(f"fixing stale link '{path}'")
                 BACKLINKS.setdefault(note, set()).add(other)
                 other.stale_links.remove(path)
         check_recent_ordered()
@@ -1255,7 +1254,6 @@ def note(path):
     except KeyError:
         flash_error(f"No such note: '{path}'")
         return flask.redirect(flask.url_for("note", path=os.path.dirname(path)))
-    print("stale links", note.stale_links)
     return flask.render_template("note.html", note=note)
 
 
