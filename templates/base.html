@@ -10,7 +10,7 @@
           integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl"
           crossorigin="anonymous">
     <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.0/font/bootstrap-icons.css">
     {% block css %}
     {% endblock %}
   </head>
@@ -97,7 +97,7 @@
           {% for msg in get_flashed_messages(category_filter=['warning']) %}
           <div class="alert alert-warning alert-dismissible fade show"
                role="alert">
-            <strong>Note:</strong> {{ msg }}
+            <strong>Attention:</strong> {{ msg }}
             <button type="button" aria-label="Close"
                     class="btn-close" data-bs-dismiss="alert"></button>
           </div>

@@ -33,7 +33,8 @@
   <span class="bi-clipboard text-dark"></span>
 </button>
 {{ starred(note) }}
-<a href="{{ note.url }}" class="py-0 my-0 text-decoration-none">{{ note.title }}</a>
+<a href="{{ note.url }}" class="py-0 my-0 text-decoration-none">
+  {{ note.title or '<root>' }}</a>
 {{ filetype(note) }}
 {{ subnotes(note, level=level) }}
 {% endmacro %}

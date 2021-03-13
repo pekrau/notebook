@@ -1,5 +1,9 @@
 {% extends 'base.html' %}
 
+{% block css %}
+{% include 'datatables-css.html' %}
+{% endblock %}
+
 {% block head_title %}Search{% endblock %}
 {% block body_title %}Search{% endblock %}
 
@@ -31,3 +35,7 @@
 {% include 'recent.html' %}
 {% endif %} {# if interactive #}
 {% endblock %} {# block right #}
+
+{% block javascript %}
+{% include 'datatables-js.html' %}
+{% endblock %}

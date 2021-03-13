@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block head_title %}Create a new note{% endblock %}
-
 {% block body_title %}Create a new note{% endblock %}
 
 {% block main %}
@@ -30,7 +29,7 @@
         <input type="text" name="title" id="title" autofocus
                class="form-control"
                aria-describedby="titleHelp"
-               value="{{ source and ('Copy of ' + source.title) or '' }}">
+               value="{{ title or '' }}">
         <div id="titleHelp" class="form-text">
           Title of the new note; defines the filename of the note on disk.
         </div>
@@ -50,8 +49,7 @@
         <label for="text" class="col-form-label">Text</label>
         <textarea name="text" id="text" rows="12"
                   class="form-control"
-                  aria-describedby="textHelp"
-                  >{{ source and source.text or '' }}</textarea>
+                  aria-describedby="textHelp">{{ text or '' }}</textarea>
         <div id="textHelp" class="form-text">
           Text of the new note in Markdown format.
         </div>
@@ -63,23 +61,11 @@
     </form>
   </div>
 </div>
-{% if source %}
-<a href="{{ source.url }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
-{% elif supernote %}
-<a href="{{ supernote.url }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
-{% else %}
-<a href="{{ url_for('home') }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
-{% endif %}
+<a href="{{ cancel_url }}" class="btn btn-secondary m-md-3 px-5">Cancel</a>
 {% endblock %} {# block main #}
 
 {% block right %}
-{% if source %}
-<a href="{{ source.url }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
-{% elif supernote %}
-<a href="{{ supernote.url }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
-{% else %}
-<a href="{{ url_for('home') }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
-{% endif %}
+<a href="{{ cancel_url }}" class="btn btn-secondary d-grid mb-3">Cancel</a>
 {% include 'starred.html' %}
 {% include 'recent.html' %}
 {% endblock %} {# block right #}

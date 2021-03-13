@@ -50,12 +50,4 @@
 
 {% block javascript %}
 {% include 'datatables-js.html' %}
-<script>
-  $(document).ready(function() {
-    $('#notes').DataTable({
-      "lengthMenu": [10, 20, 40, 60, 80, 100],
-      "pageLength": 20
-    });
-  } );
-</script>
-{% endblock %} {#% block javascript #}
+{% endblock %}
