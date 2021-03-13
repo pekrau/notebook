@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
 import collections
 import importlib
@@ -1128,10 +1128,6 @@ def setup():
     check_synced_filesystem()
     check_synced_memory()
     flash_message(f"Setup {timer}")
-    for key, values in ATTRIBUTES.items():
-        print(key)
-        for value, notes in values.items():
-            print("  ", value, notes)
 
 
 @app.context_processor

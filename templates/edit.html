@@ -18,6 +18,7 @@
           enctype="multipart/form-data"
           method="POST">
       {{ get_csrf_token() }}
+
       {% if note.supernote %}
       <div class="mb-3">
         <label for="title" class="col-form-label">Title</label>
@@ -27,6 +28,7 @@
                value="{{ note['title'] }}">
       </div>
       {% endif %}
+
       <div class="mb-3">
         <label for="text" class="col-form-label">Text</label>
         <textarea name="text" id="text" rows="16" autofocus
@@ -36,6 +38,7 @@
           Text of the note in Markdown format.
         </div>
       </div>
+
       {% if note.supernote %}
       <div class="row">
         <div class="col-md-8 mb-3">
@@ -49,6 +52,7 @@
             {% endif %}
           </div>
         </div>
+
         {% if note.has_file %}
         <div class="col-md-4 mb-3">
           <label for="removefile" class="form-label"></label>
@@ -62,6 +66,7 @@
           </div>
         </div>
         {% endif %}
+
       </div>
       {% endif %}
       <div class="mb-3">
@@ -72,6 +77,14 @@
 </div>
 <a href="{{ url_for('note', path=note['path']) }}"
    class="btn btn-secondary m-md-3 px-5">Cancel</a>
+
+{% if note.has_image_file %}
+<div class="my-md-2">
+  <img src="{{ url_for('file', path=note.path) }}"
+       class="img-fluid border border-secondary">
+</div>
+{% endif %} {# if note.has_image_file #}
+
 {% endblock %} {# block main #}
 
 {% block right %}
