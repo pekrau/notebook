@@ -19,8 +19,8 @@ class BaseOperation:
     def description(self):
         return self.__class__.__doc__
 
-    def is_relevant(self, note):
-        "Is this operation relevant for the given note?"
+    def is_applicable(self, note):
+        "Is this operation applicable to the given note?"
         return False
 
     def get_parameters(self, note):

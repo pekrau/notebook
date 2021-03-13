@@ -31,8 +31,8 @@ class Operation(BaseOperation):
     def title(self):
         return "Image OCR"
 
-    def is_relevant(self, note):
-        "Is this operation relevant for the given note?"
+    def is_applicable(self, note):
+        "Is this operation applicable to the given note?"
         if not note.file_extension:
             return False
         return note.file_extension in self.EXTENSIONS

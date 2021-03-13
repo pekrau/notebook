@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 
 import collections
 import importlib
@@ -96,7 +96,7 @@ def load_operations(app):
 
 def get_operations(note):
     "Get the list of operations relevant to the note."
-    return [o for o in OPERATIONS.values() if o.is_relevant(note)]
+    return [o for o in OPERATIONS.values() if o.is_applicable(note)]
 
 
 class Note:
@@ -1346,8 +1346,8 @@ def operation(name, path):
         flash_error(f"No such operation: '{name}'")
         return flask.redirect(flask.url_for("note", path=path))
     try:
-        if not op.is_relevant(note):
-            raise ValueError("The operation is not relevant for this note.")
+        if not op.is_applicable(note):
+            raise ValueError("The operation is not applicable to this note.")
         op.execute(note, flask.request.form)
         note.put_recent()
     except ValueError as error:
