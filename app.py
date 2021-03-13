@@ -3,7 +3,6 @@
 __version__ = "1.0.10"
 
 import collections
-import importlib
 import json
 import os
 import platform
@@ -16,6 +15,8 @@ import marko
 import marko.ast_renderer
 import jinja2.utils
 
+# Operations.
+import image_ocr
 
 ROOT = None  # The root note. Created in 'setup'.
 STARRED = set()  # Starred notes.
@@ -85,18 +86,6 @@ def write_settings():
         for key in ["SCRAPBOOKS"]:
             settings[key] = flask.current_app.config[key]
         json.dump(settings, outfile, indent=2)
-
-
-def load_operations(app):
-    "Load the operations modules specified in the settings."
-    for name in app.config.get("OPERATIONS", []):
-        module = importlib.import_module(name)
-        OPERATIONS[name] = module.Operation(app.config)
-
-
-def get_operations(note):
-    "Get the list of operations relevant to the note."
-    return [o for o in OPERATIONS.values() if o.is_applicable(note)]
 
 
 class Note:
@@ -1087,10 +1076,11 @@ app.add_template_filter(localtime)
 @app.before_first_request
 def setup():
     """Read all notes and keep in memory. Set up:
-    - List of recent notes
-    - List of starred notes
-    - Set up map of backlinks
-    - Set up map of hashtags
+    - List of recent notes.
+    - List of starred notes.
+    - Set up map of backlinks.
+    - Set up map of hashtags.
+    - Load operations objects.
     """
     timer = Timer()
     global ROOT
@@ -1132,6 +1122,9 @@ def setup():
         note.add_backlinks()
         note.add_hashtags()
         note.add_attributes()
+    # Load operations objects.
+    OPERATIONS["image_ocr"] = image_ocr.Operation(app.config)
+    # Debug: check everything.
     check_recent_ordered()
     check_synced_filesystem()
     check_synced_memory()
@@ -1332,6 +1325,11 @@ def edit(path=""):
         return flask.redirect(note.supernote.url)
 
 
+def get_operations(note):
+    "Get the list of operations applicable to the note."
+    return [o for o in OPERATIONS.values() if o.is_applicable(note)]
+
+
 @app.route("/op/<name>/<path:path>", methods=["POST"])
 def operation(name, path):
     get_http_method()  # Does CSRF check.
@@ -1408,6 +1406,7 @@ def star(path):
 
 @app.route("/hashtag/<word>")
 def hashtag(word):
+    "List the notes having the given hashtab."
     return flask.render_template(
         "hashtag.html", word=word, notes=sorted(HASHTAGS.get(word, list()))
     )
@@ -1415,17 +1414,23 @@ def hashtag(word):
 
 @app.route("/attribute/<key>")
 def attribute(key):
+    "Page for an attribute: list the values and the notes."
     values = sorted([(k, sorted(v)) for k, v in ATTRIBUTES.get(key, dict()).items()])
     return flask.render_template("attribute.html", key=key, values=values)
 
 
 @app.route("/attribute/<key>/<path:value>")
 def attribute_value(key, value):
+    "Page for a specific value for an attribute: list the notes."
     notes = sorted(ATTRIBUTES.get(key, dict()).get(value))
     return flask.render_template(
         "attribute_value.html", key=key, value=value, notes=notes
     )
 
+
+@app.route("/operations")
+def operations():
+    "List all operations."
 
 @app.route("/search")
 def search():
@@ -1548,5 +1553,4 @@ def change_scrapbook(scrapbook):
 if __name__ == "__main__":
     settings = get_settings()
     app.config.from_mapping(settings)
-    load_operations(app)
     app.run(debug=settings["DEBUG"])
