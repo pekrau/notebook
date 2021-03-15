@@ -5,18 +5,22 @@ file system using a browser as interface.
 
 ## Features
 
-- Each note is a single file.
-- No separate database; the directory structure is the storage.
-- Markdown for note text formatting.
+- Each note is a single Markdown file.
+- No separate database; a directory in the local file system is the storage.
 - Links in the note text; backlinks between notes updated dynamically.
 - Hashtags in note text.
+- Attributes (key-value pairs) in the note text.
 - Search all titles and text.
-- Hierarchic structure allowed; subnotes.
-- Files of any kind may be stored.
-- The app is a Flask server, so your browser is the interface for 
+- Hierarchic structure of subnotes allowed. Maps directly to hierarchical
+  directories.
+- A file of any kind may be stored as an attachment to a note.
+- The app is a `Flask` server, so your browser is the interface for 
   navigation and editing.
-- Keep separate scrapbooks (sets of notes) which can easily be
-  switched between.
+- Keep separate scrapbooks (sets of notes; separate directories) which can
+  easily be switched between.
+- Operations interface to add functionality. Current operations:
+  - Image Optical Character Recognition (OCR) using `pytesseract`.
+  - Image EXIF tags extraction using `Pillow`.
 
 ## Future features
 
@@ -39,4 +43,5 @@ Third-party software:
 - [Marko](https://github.com/frostming/marko)
 - [Bootstrap 5](https://getbootstrap.com/docs/5.0/getting-started/introduction/)
 - [clipboard.js](https://clipboardjs.com/)
-
+- [pytesseract](https://pypi.org/project/pytesseract/)
+- [Pillow](https://pypi.org/project/Pillow/)
