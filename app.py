@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.13"
+__version__ = "1.0.14"
 
 import collections
 import json
@@ -710,19 +710,27 @@ class Note:
         return True
 
     def delete(self):
-        "Delete this note."
+        "Delete this note; move to trash."
         if not self.is_deletable():
             raise ValueError("This note may not be deleted.")
         self.remove_backlinks()
         self.remove_hashtags()
         self.star(remove=True)
         self.remove_recent()
-        os.remove(self.abspath + ".md")
+        # Move to the trash directory instead of directly removing.
+        trashdir = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], "__trash__")
+        if not os.path.exists(trashdir):
+            os.mkdir(trashdir)
+        os.rename(self.abspath + ".md",
+                  os.path.join(trashdir, self.title + ".md"))
         if self.has_file:
-            os.remove(self.abspathfile)
+            os.rename(self.abspathfile,
+                      os.path.join(trashdir, self.title + self.file_extension))
+        # Fix internal representation now that supernote is no longer needed.
         self.supernote.subnotes.remove(self)
-        # Convert supernote to file if no subnotes any longer. Not root!
-        if self.supernote.count == 0 and self.supernote is not None:
+        # Convert supernote to file if no subnotes any longer.
+        # Do not do this if the supernote is root!
+        if self.supernote is not None and self.supernote.count == 0:
             abspath = self.supernote.abspath
             filepath = os.path.join(abspath, "__text__.md")
             try:
@@ -1011,7 +1019,11 @@ def check_synced_memory():
     if text != ROOT.text:
         raise RuntimeError(f"file {abspath} text differs from ROOT")
     for dirpath, dirnames, filenames in os.walk(root):
+        if dirpath.endswith("__trash__"):
+            continue
         for dirname in dirnames:
+            if dirname.startswith("_"):
+                continue
             abspath = os.path.join(dirpath, dirname)
             path = abspath[len(root) + 1 :]
             try:
@@ -1535,6 +1547,8 @@ def scrapbook():
         return change_scrapbook(dirpath)
 
     elif method == "DELETE":
+        # Does not actually delete anything; just removed the entry
+        # for the scrapbook in the settings file.
         flask.current_app.config["SCRAPBOOKS"].pop(0)
         write_settings()
         try:
