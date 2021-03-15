@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.11"
+__version__ = "1.0.12"
 
 import collections
 import json
@@ -416,8 +416,10 @@ class Note:
     def get_file_attributes(self):
         "Get the current values of the file attributes, if any."
         if self.has_file:
-            return [("File", [self.file_extension.strip(".")]),
-                    ("File size", [self.file_size])]
+            return [
+                ("File", [self.file_extension.strip(".")]),
+                ("File size", [self.file_size]),
+            ]
         else:
             return []
 
@@ -774,11 +776,15 @@ class Timer:
 
 class NoteLink(marko.inline.InlineElement):
     "Link to another note."
-    pattern = r"\[\[ *(.+?) *\]\]"
+    pattern = r"\[\[(.+?)(?:\|(.+?))?\]\]"
     parse_children = False
 
     def __init__(self, match):
-        self.ref = match.group(1)
+        self.ref = match.group(1).strip()
+        if match.group(2):
+            self.rel = match.group(2).strip()
+        else:
+            self.rel = None
 
 
 class NoteLinkRenderer:
@@ -793,12 +799,16 @@ class NoteLinkRenderer:
                 supernote = None
                 title = element.ref
             url = flask.url_for("create", supernote=supernote, title=title)
-            return f' <a href="{url}" class="text-danger"' \
-                ' title="Create a note for this stale link.">' \
-                f'[[{element.ref}]]</a>'
+            parts = [f'<a href="{url}" class="text-danger"',
+                     ' title="Create a note for this stale link.">',
+                     f"[[{element.ref}]]</a>"]
         else:
             # Link to target.
-            return f'<a class="fw-bold text-decoration-none" href="{note.url}">[[{note.title}]]</a>'
+            parts = ['<a class="fw-bold text-decoration-none"']
+            if element.rel:
+                parts.append(f' title="{element.rel}"')
+            parts.append(f' href="{note.url}">[[{note.title}]]</a>')
+        return "".join(parts)
 
 
 class HashTag(marko.inline.InlineElement):
@@ -1206,7 +1216,7 @@ def create():
             supernote=supernote,
             title=title,
             text=text,
-            cancel_url=flask.request.headers.get('referer')
+            cancel_url=flask.request.headers.get("referer"),
         )
 
     elif method == "POST":
@@ -1440,6 +1450,7 @@ def attribute_value(key, value):
 @app.route("/operations")
 def operations():
     "List all operations."
+
 
 @app.route("/search")
 def search():
