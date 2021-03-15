@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 
 import collections
 import json
@@ -407,6 +407,19 @@ class Note:
         with open(filepath, "wb") as outfile:
             outfile.write(content)
         self.file_extension = extension
+        # Update or set the attributes for the file.
+        for key, values in self.get_file_attributes():
+            attr = ATTRIBUTES.setdefault(key, dict())
+            for value in values:
+                attr.setdefault(value, set()).add(self)
+
+    def get_file_attributes(self):
+        "Get the current values of the file attributes, if any."
+        if self.has_file:
+            return [("File", [self.file_extension.strip(".")]),
+                    ("File size", [self.file_size])]
+        else:
+            return []
 
     def remove_file(self):
         "Remove the attached file, if any."
@@ -547,9 +560,7 @@ class Note:
         Includes the hard-wired attribute 'File' when present.
         """
         attributes = list(self.find_attributes(self.ast["children"]).items())
-        if self.file_extension:
-            attributes.append(("File", [self.file_extension.strip(".")]))
-            attributes.append(("File size", [self.file_size]))
+        attributes.extend(self.get_file_attributes())
         for key, values in attributes:
             attr = ATTRIBUTES.setdefault(key, dict())
             for value in values:
@@ -558,9 +569,7 @@ class Note:
     def remove_attributes(self):
         "Remove the attributes in this note from the lookup."
         attributes = list(self.find_attributes(self.ast["children"]).items())
-        if self.file_extension:
-            attributes.append(("File", [self.file_extension.strip(".")]))
-            attributes.append(("File size", [self.file_size]))
+        attributes.extend(self.get_file_attributes())
         for key, values in attributes:
             attr = ATTRIBUTES[key]
             for value in values:
@@ -1291,7 +1300,7 @@ def edit(path=""):
         except KeyError as error:
             flash_error(f"Note already exists: '{title}'")
             return flask.redirect(flask.url_for("edit", path=path))
-        # Actually change text; should update links, etc.
+        # Actually change text; updates links, hashtags, attributes.
         note.text = flask.request.form.get("text") or ""
         # Handle file remove or upload.
         if flask.request.form.get("removefile"):
