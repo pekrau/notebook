@@ -1,4 +1,4 @@
-"Operation: Image OCR."
+"Operation: Image Optical Character Recognition (OCR)."
 
 from operation import BaseOperation
 
@@ -48,9 +48,11 @@ class Operation(BaseOperation):
         }
 
     def execute(self, note, form):
-        """Execute the operation for the given note. The form is a dictionary
-        containin the required parameters; typically 'flask.request.form'.
+        """Execute the operation for the given note.
+        The form is a dictionary containin the required parameters;
+        typically 'flask.request.form'.
         Raise ValueError if something is wrong.
+        Return True if the note was changed, otherwise None.
         """
         lang = form.get("lang")
         if not lang:
@@ -70,3 +72,4 @@ class Operation(BaseOperation):
             note.text = note.text + "\n\n" + text
         else:
             note.text = text
+        return True

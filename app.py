@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.12"
+__version__ = "1.0.13"
 
 import collections
 import json
@@ -17,6 +17,7 @@ import jinja2.utils
 
 # Operations.
 import image_ocr
+import exif_tags
 
 ROOT = None  # The root note. Created in 'setup'.
 STARRED = set()  # Starred notes.
@@ -389,7 +390,7 @@ class Note:
         Does NOT change the modified timestamp, nor puts the note into
         the list of recently modified notes.
         NOTE: This is based on the assumption that the note was also
-        modified in some other way in the same operation.
+        modified in some other way in the same action.
         """
         if self is ROOT:
             raise ValueError("Cannot attach a file to the root note.")
@@ -862,10 +863,10 @@ class AttributeRenderer:
         return (
             f'<a href="{key_url}"'
             ' class="fw-bold text-success text-decoration-none">'
-            f"{element.key}:</a>"
+            f"{{{element.key}:</a>"
             f' <a href="{value_url}"'
             'class="text-success text-decoration-none">'
-            f"{element.value}</a>"
+            f"{element.value}}}</a>"
         )
 
 
@@ -1143,6 +1144,7 @@ def setup():
         note.add_attributes()
     # Load operations objects.
     OPERATIONS["image_ocr"] = image_ocr.Operation(app.config)
+    OPERATIONS["exif_tags"] = exif_tags.Operation(app.config)
     # Debug: check everything.
     check_recent_ordered()
     check_synced_filesystem()
@@ -1365,8 +1367,8 @@ def operation(name, path):
     try:
         if not op.is_applicable(note):
             raise ValueError("The operation is not applicable to this note.")
-        op.execute(note, flask.request.form)
-        note.put_recent()
+        if op.execute(note, flask.request.form):
+            note.put_recent()
     except ValueError as error:
         flash_error(error)
     check_recent_ordered()

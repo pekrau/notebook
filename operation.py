@@ -28,8 +28,10 @@ class BaseOperation:
         return {}
 
     def execute(self, note, form):
-        """Execute the operation for the given note. The form is a dictionary
-        containin the required parameters; typically 'flask.request.form'.
+        """Execute the operation for the given note. 
+        The form is a dictionary containin the required parameters;
+        typically 'flask.request.form'.
         Raise ValueError if something is wrong.
+        Return True if the note was changed, otherwise None.
         """
         raise NotImplementedError
