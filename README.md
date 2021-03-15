@@ -1,7 +1,7 @@
 # scrapbooks
 
-Simple app for personal notes, optionally with attached files, in your
-file system using your browser as interface.
+Simple app for personal notes, optionally with attached files, in the local
+file system using a browser as interface.
 
 ## Features
 
