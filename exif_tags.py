@@ -3,7 +3,7 @@
 from operation import BaseOperation
 
 import PIL
-from PIL import ExifTags
+import PIL.ExifTags
 
 
 class Operation(BaseOperation):
@@ -42,9 +42,9 @@ class Operation(BaseOperation):
         exif = img._getexif()
         if not exif:
             return
-        result = dict([(ExifTags.TAGS[k], v)
+        result = dict([(PIL.ExifTags.TAGS[k], v)
                        for k, v in exif.items()
-                       if k in ExifTags.TAGS])
+                       if k in PIL.ExifTags.TAGS])
         attributes = [f"{{{tag}: {value}}}"
                       for tag, value in sorted(result.items())]
         if form.get("newline"):
