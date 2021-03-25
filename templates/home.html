@@ -25,20 +25,13 @@
   </ul>
 </div>
 <div class="card mb-3">
-  <div class="card card-header text-white bg-dark">Scrapbooks</div>
+  <div class="card card-header text-white bg-dark">Other scrapbooks</div>
   <ul class="list-group list-group-flush">
-    {% for title, path in scrapbooks %}
-    {% if title == config['SCRAPBOOK_TITLE'] %}
-    <li class="list-group-item">
-      <a href="{{ url_for('scrapbook', title=title) }}"
-         title="{{ path }}" class="text-decoration-none fw-bold">{{ title }}</a>
-    </li>
-    {% else %}
+    {% for title, path in scrapbooks[1:] %}
     <li class="list-group-item">
       <a href="{{ url_for('switch_scrapbook', title=title) }}"
          title="{{ path }}" class="text-decoration-none">{{ title }}</a>
     </li>
-    {% endif %}
     {% endfor %}
   </ul>
 </div>

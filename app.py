@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.14"
+__version__ = "1.0.15"
 
 import collections
 import json
@@ -1584,6 +1584,24 @@ def change_scrapbook(scrapbook):
     write_settings()
     setup()
     return flask.redirect(flask.url_for("home"))
+
+@app.route("/trash")
+def trash():
+    "List trashed notes."
+    trashdir = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], "__trash__")
+    notes = {}
+    files = []
+    for filename in os.listdir(trashdir):
+        basename, ext = os.path.splitext(filename)
+        if ext == ".md":
+            notes[basename] = {}
+        else:
+            files.append(filename)
+    for filename in files:
+        basename, ext = os.path.splitext(filename)
+        notes[basename]["file"] = ext
+        notes[basename]["size"] = os.path.getsize(os.path.join(trashdir, filename))
+    return flask.render_template("trash.html", notes=sorted(notes.items()))
 
 
 if __name__ == "__main__":

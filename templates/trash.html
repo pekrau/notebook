@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block css %}
+{% include 'datatables-css.html' %}
+{% endblock %}
+
+{% block head_title %}Trash{% endblock %}
+{% block body_title %}Trash{% endblock %}
+
+{% block left_main %}
+<div class="col-md-10">
+  <table id="notes" class="table table-sm table-hover table-responsive">
+    <thead>
+      <tr>
+        <th>Note</th>
+        <th>File type</th>
+        <th>File size</th>
+        <th>Restore</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, data in notes %}
+      <tr>
+        <td>{{ name }}</td>
+        {% if data %}
+        <td>{{ data['file'] }}</td>
+        <td>{{ data['size'] | filesizeformat }}</td>
+        {% else %}
+        <td></td>
+        <td></td>
+        {% endif %}
+      </tr>
+      {% endfor %} {# for note in notes #}
+    </tbody>
+  </table>
+</div>
+{% endblock %} {# block left_main #}
+
+{% block right %}
+{% if interactive %}
+{% include 'starred.html' %}
+{% include 'recent.html' %}
+{% endif %} {# if interactive #}
+{% endblock %} {# block right #}
+
+{% block javascript %}
+{% include 'datatables-js.html' %}
+{% endblock %}
