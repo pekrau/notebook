@@ -19,9 +19,9 @@
       </tr>
     </thead>
     <tbody>
-      {% for name, data in notes %}
+      {% for title, data in notes %}
       <tr>
-        <td>{{ name }}</td>
+        <td>{{ title }}</td>
         {% if data %}
         <td>{{ data['file'] }}</td>
         <td>{{ data['size'] | filesizeformat }}</td>
@@ -29,6 +29,14 @@
         <td></td>
         <td></td>
         {% endif %}
+        <td>
+          <form action="{{ url_for('restore', title=title) }}"
+                method="POST">
+            {{ get_csrf_token() }}
+            <input type="text" name="supernote" class="form-control"
+                   placeholder="Destination supernote" size="8">
+          </form>
+        </td>
       </tr>
       {% endfor %} {# for note in notes #}
     </tbody>
@@ -37,6 +45,14 @@
 {% endblock %} {# block left_main #}
 
 {% block right %}
+<form action="{{ url_for('purge') }}"
+      class="d-grid mb-3"
+      method="POST">
+  {{ get_csrf_token() }}
+  <button role="submit" class="btn btn-sm btn-danger"
+          onclick="return confirm('Really purge all files? Cannot be undone.')">
+    Purge</button>
+</form>
 {% if interactive %}
 {% include 'starred.html' %}
 {% include 'recent.html' %}

@@ -1,8 +1,9 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.0.15"
+__version__ = "1.1.0"
 
 import collections
+import glob
 import json
 import os
 import platform
@@ -949,7 +950,11 @@ def cleanup_title(title):
 
 
 def get_note(path):
-    "Get the note given its path."
+    "Get the note given its path. First removes link characters '[[' and ']]'."
+    if path.startswith("[["):
+        path = path[2:]
+    if path.endswith("]]"):
+        path = path[:-2]
     if not path:
         return ROOT
     note = ROOT
@@ -1406,10 +1411,6 @@ def move(path):
 
     elif method == "POST":
         supernote = flask.request.form.get("supernote") or ""
-        if supernote.startswith("[["):
-            supernote = supernote[2:]
-        if supernote.endswith("]]"):
-            supernote = supernote[:-2]
         try:
             supernote = get_note(supernote)
         except KeyError:
@@ -1602,6 +1603,51 @@ def trash():
         notes[basename]["file"] = ext
         notes[basename]["size"] = os.path.getsize(os.path.join(trashdir, filename))
     return flask.render_template("trash.html", notes=sorted(notes.items()))
+
+@app.route("/restore/<title>", methods=["POST"])
+def restore(title):
+    "Restore a trashed note."
+    trashdir = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], "__trash__")
+    try:
+        if not os.path.exists(os.path.join(trashdir, f"{title}.md")):
+            raise KeyError(f"No such trashed note: '{title}'")
+        try:
+            superpath = flask.request.form["supernote"]
+            if not superpath:
+                raise KeyError
+        except KeyError:
+            supernote = ROOT
+        else:
+            try:
+                supernote = get_note(superpath)
+            except KeyError:
+                raise KeyError(f"No such supernote: '{superpath}'")
+    except KeyError as error:
+        flash_error(str(error))
+        return flask.redirect(flask.url_for("trash"))
+    paths = [p for p in glob.glob(os.path.join(trashdir, f"{title}.*"))]
+    notepath = [p for p in paths if p.endswith(".md")][0]
+    with open(notepath) as infile:
+        text = infile.read()
+    os.remove(notepath)
+    note = supernote.create_subnote(title, text)
+    paths.remove(notepath)
+    if paths:
+        filepath = paths[0]
+        with open(filepath, "rb") as infile:
+            content = infile.read()
+        os.path(filepath)
+        extension = os.path.splitext(filepath)[1]
+        note.upload_file(content, extension)
+    return flask.redirect(note.url)
+
+@app.route("/purge", methods=["POST"])
+def purge():
+    "Purge all trashed notes."
+    trashdir = os.path.join(flask.current_app.config["SCRAPBOOK_DIRPATH"], "__trash__")
+    for filename in os.listdir(trashdir):
+        os.remove(os.path.join(trashdir, filename))
+    return flask.redirect(flask.url_for('trash'))
 
 
 if __name__ == "__main__":
