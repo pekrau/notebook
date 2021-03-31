@@ -29,7 +29,11 @@
 {% endblock %}
 
 {% block meta %}
-<small>{{ note.modified | localtime }}</small>
+<small>
+  {{ note.modified | localtime }}
+  <br>
+  {{ note.n_characters }} characters, {{ note.n_words }} words
+</small>
 {% endblock %}
 
 {% block left %}

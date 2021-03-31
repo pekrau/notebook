@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 import collections
 import glob
@@ -206,6 +206,18 @@ class Note:
     text = property(
         get_text, set_text, doc="The text of the note using Markdown format."
     )
+
+    @property
+    def n_characters(self):
+        "Return the number of characters in the text."
+        return len(self._text)
+
+    @property
+    def n_words(self):
+        "Return the number of words in the text."
+        # XXX Approximate implementation.
+        return sum([i.strip(string.punctuation).isalpha()
+                    for i in self._text.split()])
 
     def get_modified(self):
         if self.subnotes or self is ROOT:
