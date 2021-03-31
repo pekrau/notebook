@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 import collections
 import glob
@@ -16,17 +16,12 @@ import marko
 import marko.ast_renderer
 import jinja2.utils
 
-# Operations.
-import image_ocr
-import exif_tags
-
 ROOT = None  # The root note. Created in 'setup'.
 STARRED = set()  # Starred notes.
 RECENT = None  # Deque of recently modified notes. Created in 'setup'.
 BACKLINKS = dict()  # Map target note -> set of source notes.
 HASHTAGS = dict()  # Map word -> set of notes.
 ATTRIBUTES = dict()  # Map word -> map values -> set of notes.
-
 OPERATIONS = dict()  # Map operation name -> operation object.
 
 
@@ -1154,14 +1149,25 @@ def setup():
                     pass
     except OSError:
         pass
+
     # Set up the backlinks, hashtags and attributes for all notes.
     for note in ROOT.traverse():
         note.add_backlinks()
         note.add_hashtags()
         note.add_attributes()
+
     # Load operations objects.
-    OPERATIONS["image_ocr"] = image_ocr.Operation(app.config)
-    OPERATIONS["exif_tags"] = exif_tags.Operation(app.config)
+    try:
+        import image_ocr
+        OPERATIONS["image_ocr"] = image_ocr.Operation(app.config)
+    except ImportError:
+        flash_error("Could not load operation 'image_ocr'.")
+    try:
+        import exif_tags
+        OPERATIONS["exif_tags"] = exif_tags.Operation(app.config)
+    except ImportError:
+        flash_error("Could not load operation 'exif_tags'.")
+
     # Debug: check everything.
     check_recent_ordered()
     check_synced_filesystem()
