@@ -9,11 +9,9 @@ import PIL.ExifTags
 class Operation(BaseOperation):
     "Extract EXIF tags from the image file."
 
-    EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
+    title = "Extract EXIF tags"
 
-    @property
-    def title(self):
-        return "Extract EXIF tags"
+    EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
 
     def is_applicable(self, note):
         "Is this operation applicable to the given note?"
@@ -36,7 +34,9 @@ class Operation(BaseOperation):
         The form is a dictionary containin the required parameters;
         typically 'flask.request.form'.
         Raise ValueError if something is wrong.
-        Return True if the note was changed, otherwise None.
+        Return True if the note was changed.
+        If this operation generates a response, return it.
+        Otherwise return None.
         """
         img = PIL.Image.open(note.abspathfile)
         exif = img._getexif()

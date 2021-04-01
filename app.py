@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 
 import collections
 import glob
@@ -183,7 +183,7 @@ class Note:
             for old_path, new_path in changed_paths:
                 text = text.replace(f"[[{old_path}]]", f"[[{new_path}]]")
             note._text = text  # Do not add backlinks just yet.
-            note._ast = None  # Force recompile of AST.
+            note._ast = None  # Will force recompile of AST.
             note.write(update_modified=False)
 
     title = property(get_title, set_title, doc="The title of the note.")
@@ -197,7 +197,7 @@ class Note:
         self.remove_hashtags()
         self.remove_attributes()
         self._text = text
-        self._ast = None  # Force recompile of AST.
+        self._ast = None  # Will force recompile of AST.
         self.add_backlinks()
         self.add_hashtags()
         self.add_attributes()
@@ -366,11 +366,12 @@ class Note:
             result = []
         return result
 
-    def traverse(self):
+    def traverse(self, level=0):
         "Return a generator traversing this note and its subnotes."
+        self.level = level
         yield self
         for subnote in self.subnotes:
-            yield from subnote.traverse()
+            yield from subnote.traverse(level=level+1)
 
     def write(self, update_modified=True):
         "Write this note to disk. Does *not* write subnotes."
@@ -456,7 +457,7 @@ class Note:
                 with open(filepath, "w") as outfile:
                     outfile.write("")
                 os.utime(filepath, (stat.st_atime, stat.st_mtime))
-            self._ast = None  # Force recompile of AST.
+            self._ast = None  # Will force recompile of AST.
             self._files = {}  # Needed only during read of subnotes.
             basenames = []
             for filename in sorted(os.listdir(self.abspath)):
@@ -486,7 +487,7 @@ class Note:
             filepath = self.abspath + ".md"
             with open(filepath) as infile:
                 self._text = infile.read()
-                self._ast = None  # Force recompile of AST.
+                self._ast = None  # Will force recompile of AST.
         # Both directory (except root) and file note may have
         # an attachment, which would be a single file at the
         # same level with the same name, but a non-md extension.
@@ -897,7 +898,7 @@ class Extensions:
 
 
 class HTMLRenderer(marko.html_renderer.HTMLRenderer):
-    "Fix output for Bootstrap."
+    "Fix blockquote output class for Bootstrap."
 
     def render_quote(self, element):
         return '<blockquote class="blockquote">\n{}</blockquote>\n'.format(
@@ -1179,6 +1180,11 @@ def setup():
         OPERATIONS["exif_tags"] = exif_tags.Operation(app.config)
     except ImportError:
         flash_error("Could not load operation 'exif_tags'.")
+    try:
+        import ms_word
+        OPERATIONS["ms_word"] = ms_word.Operation(app.config)
+    except ImportError:
+        flash_error("Could not load operation 'ms_word'.")
 
     # Debug: check everything.
     check_recent_ordered()
@@ -1402,11 +1408,15 @@ def operation(name, path):
     try:
         if not op.is_applicable(note):
             raise ValueError("The operation is not applicable to this note.")
-        if op.execute(note, flask.request.form):
-            note.put_recent()
+        result = op.execute(note, flask.request.form)
     except ValueError as error:
         flash_error(error)
-    check_recent_ordered()
+        return flask.redirect(flask.url_for("note", path=path))
+    if result == True:
+        note.put_recent()
+        check_recent_ordered()
+    elif result:
+        return result
     return flask.redirect(flask.url_for("note", path=path))
 
 

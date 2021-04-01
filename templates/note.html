@@ -154,7 +154,8 @@
                   <input type="radio" name="{{ key }}"
                          id="{{ operation.name }}-{{ key }}-{{ value }}"
                          class="form-check-input" 
-                         value="{{ value }}">
+                         value="{{ value }}"
+                         {{ param.get('default') == value and 'checked' or '' }}>
                   <label class="form-check-label"
                          for="{{ operation.name }}-{{ key }}-{{ value }}">
                     {{ value }}</label>
@@ -167,7 +168,8 @@
                 <input type="checkbox" name="{{ key }}"
                        id="{{ operation.name }}-{{ key }}"
                        class="form-check-input"
-                       value="true">
+                       value="true"
+                       {{ param.get('default') and 'checked' or '' }}>
                 <label class="form-check-label"
                        for="{{ operation.name }}-{{ key }}">
                   {{ param['label'] }}

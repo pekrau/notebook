@@ -10,6 +10,8 @@ class Operation(BaseOperation):
     The identified text is added to the note.
     """
 
+    title = "Image OCR"
+
     DEFAULT_TIMEOUT = 5.0
     EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
 
@@ -26,10 +28,6 @@ class Operation(BaseOperation):
                 pass
         if not self.languages:
             raise ValueError("No languages available for pytesseract.")
-
-    @property
-    def title(self):
-        return "Image OCR"
 
     def is_applicable(self, note):
         "Is this operation applicable to the given note?"
@@ -52,7 +50,9 @@ class Operation(BaseOperation):
         The form is a dictionary containin the required parameters;
         typically 'flask.request.form'.
         Raise ValueError if something is wrong.
-        Return True if the note was changed, otherwise None.
+        Return True if the note was changed.
+        If this operation generates a response, return it.
+        Otherwise return None.
         """
         lang = form.get("lang")
         if not lang:

@@ -4,16 +4,14 @@
 class BaseOperation:
     "Abstract base class for operation."
 
+    title = "Short user-friendly name of the operation."
+
     def __init__(self, config):
         pass
 
     @property
     def name(self):
         return self.__class__.__module__
-
-    @property
-    def title(self):
-        return "Short name for the operation."
 
     @property
     def description(self):
@@ -28,10 +26,12 @@ class BaseOperation:
         return {}
 
     def execute(self, note, form):
-        """Execute the operation for the given note. 
+        """Execute the operation for the given note.
         The form is a dictionary containin the required parameters;
         typically 'flask.request.form'.
         Raise ValueError if something is wrong.
-        Return True if the note was changed, otherwise None.
+        Return True if the note was changed.
+        If this operation generates a response, return it.
+        Otherwise return None.
         """
         raise NotImplementedError
