@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 
 import collections
 import glob

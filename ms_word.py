@@ -4,6 +4,7 @@ import io
 import json
 
 import docx
+from docx.enum.style import WD_STYLE_TYPE
 import flask
 
 from operation import BaseOperation
@@ -28,9 +29,9 @@ class Operation(BaseOperation):
                 "label": "Include subnotes.",
                 "default": True
             },
-            "font": {
+            "font_name": {
                 "type": "select",
-                "description": "The font to use for running text.",
+                "description": "The name of the font to use for running text.",
                 "values": ["Arial", "New Times Roman", "Calibri"],
                 "default": "Arial"
             }
@@ -45,46 +46,55 @@ class Operation(BaseOperation):
         If this operation generates a response, return it.
         Otherwise return None.
         """
-        document = docx.Document()
-        font = form.get("font")
-        if font:
-            document.styles["Normal"].font.name = font
+        self.document = docx.Document()
+        font_name = form.get("font_name")
+        if font_name:
+            self.document.styles["Normal"].font.name = font_name
+            self.document.styles["Title"].font.name = font_name
+            for n in range(1, 9):
+                self.document.styles[f"Heading {n}"].font.name = font_name
         if form.get("subnotes"):
             notes = list(note.traverse())
         else:
             note.level = 0
             notes = [note]
         for n in notes:
-            document.add_heading(n.title, n.level)
+            self.paragraph = self.document.add_paragraph()
+            if n.level == 0:
+                self.paragraph.style = self.document.styles["Title"]
+            else:
+                self.paragraph.style = self.document.styles[f"Heading {n.level}"]
+            self.run = self.paragraph.add_run(n.title)
             for child in n.ast["children"]:
-                self.render(document, child)
+                self.render(child)
         output = io.BytesIO()
-        document.save(output)
+        self.document.save(output)
         response = flask.make_response(output.getvalue())
         response.headers.set("Content-Type", DOCX_MIMETYPE)
         response.headers.set("Content-Disposition", "attachment",
                              filename=f"{note.title}.docx")
         return response
 
-    def render(self, document, child):
+    def render(self, child):
         if child["element"] == "paragraph":
-            self.paragraph = document.add_paragraph()
+            self.paragraph = self.document.add_paragraph()
+            self.paragraph.style = self.document.styles["Normal"]
             self.run = self.paragraph.add_run()
             for child2 in child["children"]:
-                self.render(document, child2)
+                self.render(child2)
         elif child["element"] == "raw_text":
             self.run.add_text(child["children"])
         elif child["element"] == "emphasis":
             self.run = self.paragraph.add_run()
             self.run.italic = True
             for child2 in child["children"]:
-                self.render(document, child2)
+                self.render(child2)
             self.run = self.paragraph.add_run()
         elif child["element"] == "strong_emphasis":
             self.run = self.paragraph.add_run()
             self.run.bold = True
             for child2 in child["children"]:
-                self.render(document, child2)
+                self.render(child2)
             self.run = self.paragraph.add_run()
         else:
             print("child", json.dumps(child, indent=2))
