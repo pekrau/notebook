@@ -3,6 +3,24 @@
 {% import 'macros.html' as macros with context %}
 
 {% block head_title %}{{ note.title }}{% endblock %}
+
+{% block prev_next %}
+{% set prev = note.prev %}
+{% if prev %}
+<a href="{{ url_for('note', path=prev.path) }}"
+   class="btn btn-secondary" role="button" title="Previous">
+  <span title="Previous" class="bi-caret-left"></span>
+</a>
+{% endif %}
+{% set next = note.next %}
+{% if next %}
+<a href="{{ url_for('note', path=next.path) }}"
+   class="btn btn-secondary" role="button" title="Next">
+  <span title="Next" class="bi-caret-right"></span>
+</a>
+{% endif %}
+{% endblock %}
+
 {% block body_title %}
 <button class="btn btn-outline-none p-0 clipboard"
         data-clipboard-text="[[{{ note.path }}]]"

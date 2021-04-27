@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.4"
+__version__ = "1.1.5"
 
 import collections
 import glob
@@ -82,7 +82,7 @@ def write_settings():
     with open(filepath, "w") as outfile:
         for key in ["SCRAPBOOKS"]:
             settings[key] = flask.current_app.config[key]
-        json.dump(settings, outfile, indent=2)
+        json.dump(settings, outfile, indent=2, ensure_ascii=False)
 
 
 class Note:
@@ -324,7 +324,10 @@ class Note:
             flask.current_app.config["SCRAPBOOK_DIRPATH"], "__starred__.json"
         )
         with open(filepath, "w") as outfile:
-            json.dump({"paths": [n.path for n in STARRED]}, outfile)
+            json.dump({"paths": [n.path for n in STARRED]},
+                      outfile,
+                      indent=2,
+                      ensure_ascii=False)
 
     def put_recent(self):
         "Put the note to the start of the list of recently modified notes."
@@ -362,9 +365,30 @@ class Note:
         if self.supernote:
             result = list(self.supernote.subnotes)
             result.remove(self)
+            return result
         else:
-            result = []
-        return result
+            return []
+
+    @property
+    def prev(self):
+        "The previous sibling, if any. Will circle round to the last."
+        if self.supernote:
+            pos = self.supernote.subnotes.index(self)
+            return self.supernote.subnotes[pos-1]
+        else:
+            return None
+
+    @property
+    def next(self):
+        "The next sibling, if any. Will circle round to the first."
+        if self.supernote:
+            pos = self.supernote.subnotes.index(self)
+            try:
+                return self.supernote.subnotes[pos+1]
+            except IndexError:
+                return self.supernote.subnotes[0]
+        else:
+            return None
 
     def traverse(self, level=0):
         "Return a generator traversing this note and its subnotes."

@@ -16,6 +16,9 @@ class Operation(BaseOperation):
 
     title = "MS Word file"
 
+    def __init__(self, config):
+        self.debug = config.get("DEBUG")
+
     def is_applicable(self, note):
         "Is this operation applicable to the given note?"
         return True
@@ -96,5 +99,12 @@ class Operation(BaseOperation):
             for child2 in child["children"]:
                 self.render(child2)
             self.run = self.paragraph.add_run()
+        elif child["element"] == "heading":
+            self.paragraph = self.document.add_paragraph()
+            self.paragraph.style = self.document.styles[f"Heading {child['level']}"]
+            self.run = self.paragraph.add_run()
+            for child2 in child["children"]:
+                self.render(child2)
         else:
-            print("child", json.dumps(child, indent=2))
+            if self.debug:
+                print("child", json.dumps(child, indent=2))

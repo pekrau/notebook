@@ -12,7 +12,7 @@ class Operation(BaseOperation):
 
     title = "Image OCR"
 
-    DEFAULT_TIMEOUT = 5.0
+    DEFAULT_TIMEOUT = 8.0
     EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
 
     def __init__(self, config):
