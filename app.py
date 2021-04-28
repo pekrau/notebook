@@ -371,7 +371,7 @@ class Note:
 
     @property
     def prev(self):
-        "The previous sibling, if any. Will circle round to the last."
+        "The previous sibling, if any. Circles around to the last."
         if self.supernote:
             pos = self.supernote.subnotes.index(self)
             return self.supernote.subnotes[pos-1]
@@ -380,7 +380,7 @@ class Note:
 
     @property
     def next(self):
-        "The next sibling, if any. Will circle round to the first."
+        "The next sibling, if any. Circles around to the first."
         if self.supernote:
             pos = self.supernote.subnotes.index(self)
             try:

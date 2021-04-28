@@ -8,14 +8,14 @@
 {% set prev = note.prev %}
 {% if prev %}
 <a href="{{ url_for('note', path=prev.path) }}"
-   class="btn btn-secondary" role="button" title="Previous">
+   class="btn btn-secondary" role="button" title="Previous sibling">
   <span title="Previous" class="bi-caret-left"></span>
 </a>
 {% endif %}
 {% set next = note.next %}
 {% if next %}
 <a href="{{ url_for('note', path=next.path) }}"
-   class="btn btn-secondary" role="button" title="Next">
+   class="btn btn-secondary" role="button" title="Next sibling">
   <span title="Next" class="bi-caret-right"></span>
 </a>
 {% endif %}
@@ -61,14 +61,6 @@
 {% endblock %} {# block left #}
 
 {% block main %}
-{% if note.has_file %}
-<a href="{{ url_for('file', path=note.path) }}" target="_blank"
-   role="button" class="btn btn-dark px-5 mb-3"
-   title="Download the attached file.">
-  {{ note.file_extension.strip('.') }} ({{ note.file_size | filesizeformat }})
-</a>
-{% endif %} {# if note.has_file #}
-
 {{ note['text'] | markdown }}
 
 {% if note.has_image_file %}
@@ -101,6 +93,13 @@
 {% endblock %} {# block main #}
 
 {% block right %}
+{% if note.has_file %}
+<a href="{{ url_for('file', path=note.path) }}" target="_blank"
+   role="button" class="btn btn-dark d-grid mb-3"
+   title="Download the attached file.">
+  {{ note.file_extension.strip('.') }} ({{ note.file_size | filesizeformat }})
+</a>
+{% endif %} {# if note.has_file #}
 <a href="{{ url_for('edit', path=note.path) }}"
    role="button" class="btn btn-primary d-grid mb-3"
    title="Edit the titel and/or text of this note.">Edit</a>
