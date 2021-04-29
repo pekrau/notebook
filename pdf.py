@@ -1,20 +1,19 @@
-"Operation: Produce MS Word file (docx) from a note and its subnotes."
+"Operation: Produce PDF file from a note and its subnotes."
 
 import io
 import json
 
-import docx
-from docx.enum.style import WD_STYLE_TYPE
+import reportlab
 import flask
 
 from operation import BaseOperation
 
-DOCX_MIMETYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+DOCX_MIMETYPE = "application/pdf"
 
 class Operation(BaseOperation):
-    "Produce MS Word file (docx) from a note and its subnotes."
+    "Produce PDF file from a note and its subnotes."
 
-    title = "MS Word file"
+    title = "PDF file"
 
     def __init__(self, config):
         self.debug = config.get("DEBUG")
@@ -35,8 +34,8 @@ class Operation(BaseOperation):
             "font_name": {
                 "type": "select",
                 "description": "The name of the font to use for running text.",
-                "values": ["Arial", "New Times Roman", "Calibri"],
-                "default": "Arial"
+                "values": ["Helvetica", "Times-Roman", "Courier"],
+                "default": "Helvetica"
             }
         }
 
