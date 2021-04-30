@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.1.5"
+__version__ = "1.2.0"
 
 import collections
 import glob
@@ -1209,6 +1209,12 @@ def setup():
         OPERATIONS["ms_word"] = ms_word.Operation(app.config)
     except ImportError:
         flash_error("Could not load operation 'ms_word'.")
+
+    try:
+        import pdf
+        OPERATIONS["pdf"] = pdf.Operation(app.config)
+    except ImportError:
+        flash_error("Could not load operation 'pdf'.")
 
     # Debug: check everything.
     check_recent_ordered()

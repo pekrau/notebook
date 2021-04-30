@@ -34,7 +34,7 @@ class Operation(BaseOperation):
             },
             "font_name": {
                 "type": "select",
-                "description": "The name of the font to use for running text.",
+                "description": "The name of the font to use for body text.",
                 "values": ["Arial", "New Times Roman", "Calibri"],
                 "default": "Arial"
             }
@@ -79,6 +79,7 @@ class Operation(BaseOperation):
         return response
 
     def render(self, child):
+        "Output content of child recursively."
         if child["element"] == "paragraph":
             self.paragraph = self.document.add_paragraph()
             self.paragraph.style = self.document.styles["Normal"]

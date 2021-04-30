@@ -3,12 +3,17 @@
 import io
 import json
 
-import reportlab
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.rl_config import defaultPageSize
+
 import flask
 
 from operation import BaseOperation
 
-DOCX_MIMETYPE = "application/pdf"
+PDF_MIMETYPE = "application/pdf"
+
 
 class Operation(BaseOperation):
     "Produce PDF file from a note and its subnotes."
@@ -33,7 +38,7 @@ class Operation(BaseOperation):
             },
             "font_name": {
                 "type": "select",
-                "description": "The name of the font to use for running text.",
+                "description": "The name of the font to use for body text.",
                 "values": ["Helvetica", "Times-Roman", "Courier"],
                 "default": "Helvetica"
             }
@@ -48,62 +53,77 @@ class Operation(BaseOperation):
         If this operation generates a response, return it.
         Otherwise return None.
         """
-        self.document = docx.Document()
+        output = io.BytesIO()
+        self.document = SimpleDocTemplate(output)
+        self.styles = getSampleStyleSheet()
         font_name = form.get("font_name")
         if font_name:
-            self.document.styles["Normal"].font.name = font_name
-            self.document.styles["Title"].font.name = font_name
-            for n in range(1, 9):
-                self.document.styles[f"Heading {n}"].font.name = font_name
+            self.styles["BodyText"].fontName = font_name
+        self.styles["BodyText"].leading = 1.5 * self.styles["BodyText"].fontSize
         if form.get("subnotes"):
             notes = list(note.traverse())
         else:
             note.level = 0
             notes = [note]
+        self.items = [Spacer(1, 0.1*cm)]
         for n in notes:
-            self.paragraph = self.document.add_paragraph()
-            if n.level == 0:
-                self.paragraph.style = self.document.styles["Title"]
-            else:
-                self.paragraph.style = self.document.styles[f"Heading {n.level}"]
-            self.run = self.paragraph.add_run(n.title)
+            self.items.append(Paragraph(n.title, self.styles["Title"]))
+            self.items.append(Spacer(1, 0.1 * cm))
+            self.content = ""
             for child in n.ast["children"]:
                 self.render(child)
-        output = io.BytesIO()
-        self.document.save(output)
+        self.document.build(self.items,
+                            onFirstPage=self.page_number,
+                            onLaterPages=self.page_number)
         response = flask.make_response(output.getvalue())
-        response.headers.set("Content-Type", DOCX_MIMETYPE)
+        response.headers.set("Content-Type", PDF_MIMETYPE)
         response.headers.set("Content-Disposition", "attachment",
-                             filename=f"{note.title}.docx")
+                             filename=f"{note.title}.pdf")
         return response
 
     def render(self, child):
+        "Output content of child recursively."
         if child["element"] == "paragraph":
-            self.paragraph = self.document.add_paragraph()
-            self.paragraph.style = self.document.styles["Normal"]
-            self.run = self.paragraph.add_run()
+            if self.content:
+                self.items.append(
+                    Paragraph(self.content, self.styles["BodyText"]))
+                self.content = ""
             for child2 in child["children"]:
                 self.render(child2)
         elif child["element"] == "raw_text":
-            self.run.add_text(child["children"])
+            self.content += child["children"]
         elif child["element"] == "emphasis":
-            self.run = self.paragraph.add_run()
-            self.run.italic = True
+            self.content += "<i>"
             for child2 in child["children"]:
                 self.render(child2)
-            self.run = self.paragraph.add_run()
+            self.content += "</i>"
         elif child["element"] == "strong_emphasis":
-            self.run = self.paragraph.add_run()
-            self.run.bold = True
+            self.content += "<b>"
             for child2 in child["children"]:
                 self.render(child2)
-            self.run = self.paragraph.add_run()
+            self.content += "</b>"
+        elif child["element"] == "blank_line":
+            if self.content:
+                self.items.append(
+                    Paragraph(self.content, self.styles["BodyText"]))
+                self.content = ""
+            self.items.append(Spacer(1, 0.1 * cm))
         elif child["element"] == "heading":
-            self.paragraph = self.document.add_paragraph()
-            self.paragraph.style = self.document.styles[f"Heading {child['level']}"]
-            self.run = self.paragraph.add_run()
+            if self.content:
+                self.items.append(
+                    Paragraph(self.content, self.styles["BodyText"]))
+            self.content = ""
             for child2 in child["children"]:
                 self.render(child2)
+            self.items.append(
+                Paragraph(self.content, self.styles[f"Heading{child['level']}"]))
+            self.content = ""
         else:
             if self.debug:
                 print("child", json.dumps(child, indent=2))
+
+    def page_number(self, canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 9)
+        canvas.drawString(defaultPageSize[0] - 2 * cm, 2 * cm, f"{doc.page}")
+        canvas.restoreState()
