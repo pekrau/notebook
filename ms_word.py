@@ -106,6 +106,5 @@ class Operation(BaseOperation):
             self.run = self.paragraph.add_run()
             for child2 in child["children"]:
                 self.render(child2)
-        else:
-            if self.debug:
-                print("child", json.dumps(child, indent=2))
+        elif self.debug:
+            print("child", json.dumps(child, indent=2))

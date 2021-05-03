@@ -59,8 +59,6 @@ class Operation(BaseOperation):
         If this operation generates a response, return it.
         Otherwise return None.
         """
-        output = io.BytesIO()
-        self.document = SimpleDocTemplate(output)
         self.styles = getSampleStyleSheet()
         font_name = form.get("font_name")
         self.styles["BodyText"].fontSize = 11
@@ -86,13 +84,12 @@ class Operation(BaseOperation):
             self.content = ""
             for child in n.ast["children"]:
                 self.render(child)
-            if self.content:
-                self.items.append(
-                    Paragraph(self.content, self.styles["BodyText"]))
-                self.content = ""
-        self.document.build(self.items,
-                            onFirstPage=self.page_number,
-                            onLaterPages=self.page_number)
+            self.flush()
+        output = io.BytesIO()
+        document = SimpleDocTemplate(output)
+        document.build(self.items,
+                       onFirstPage=self.page_number,
+                       onLaterPages=self.page_number)
         response = flask.make_response(output.getvalue())
         response.headers.set("Content-Type", PDF_MIMETYPE)
         response.headers.set("Content-Disposition", "attachment",
@@ -102,10 +99,7 @@ class Operation(BaseOperation):
     def render(self, child):
         "Output content of child recursively."
         if child["element"] == "paragraph":
-            if self.content:
-                self.items.append(
-                    Paragraph(self.content, self.styles["BodyText"]))
-                self.content = ""
+            self.flush()
             for child2 in child["children"]:
                 self.render(child2)
         elif child["element"] == "raw_text":
@@ -121,16 +115,10 @@ class Operation(BaseOperation):
                 self.render(child2)
             self.content += "</b>"
         elif child["element"] == "blank_line":
-            if self.content:
-                self.items.append(
-                    Paragraph(self.content, self.styles["BodyText"]))
-                self.content = ""
+            self.flush()
             self.items.append(Spacer(1, 0.1 * self.line_spacing * cm))
         elif child["element"] == "heading":
-            if self.content:
-                self.items.append(
-                    Paragraph(self.content, self.styles["BodyText"]))
-            self.content = ""
+            self.flush()
             for child2 in child["children"]:
                 self.render(child2)
             self.items.append(
@@ -138,6 +126,12 @@ class Operation(BaseOperation):
             self.content = ""
         elif self.debug:
             print("child", json.dumps(child, indent=2))
+
+    def flush(self):
+        "If any content, then flush it out."
+        if self.content:
+            self.items.append(Paragraph(self.content, self.styles["BodyText"]))
+            self.content = ""
 
     def page_number(self, canvas, doc):
         canvas.saveState()
