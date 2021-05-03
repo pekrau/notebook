@@ -38,10 +38,16 @@ class Operation(BaseOperation):
             },
             "font_name": {
                 "type": "select",
-                "description": "The name of the font to use for body text.",
+                "description": "The font to use for body text.",
                 "values": ["Helvetica", "Times-Roman", "Courier"],
                 "default": "Helvetica"
-            }
+            },
+            "line_spacing": {
+                "type": "select",
+                "description": "Spacing between lines of body text.",
+                "values": [1, 1.5, 2],
+                "default": 1
+            },
         }
 
     def execute(self, note, form):
@@ -57,21 +63,33 @@ class Operation(BaseOperation):
         self.document = SimpleDocTemplate(output)
         self.styles = getSampleStyleSheet()
         font_name = form.get("font_name")
+        self.styles["BodyText"].fontSize = 11
         if font_name:
             self.styles["BodyText"].fontName = font_name
-        self.styles["BodyText"].leading = 1.5 * self.styles["BodyText"].fontSize
+        self.line_spacing = form.get("line_spacing")
+        if self.line_spacing:
+            self.line_spacing = float(self.line_spacing)
+            self.styles["BodyText"].leading = self.line_spacing * \
+                                              self.styles["BodyText"].fontSize
+        else:
+            self.line_spacing = 1
+        self.styles["BodyText"].leading *= 1.2
         if form.get("subnotes"):
             notes = list(note.traverse())
         else:
             note.level = 0
             notes = [note]
-        self.items = [Spacer(1, 0.1*cm)]
+        self.items = [Spacer(1, 0.1 * self.line_spacing * cm)]
         for n in notes:
             self.items.append(Paragraph(n.title, self.styles["Title"]))
-            self.items.append(Spacer(1, 0.1 * cm))
+            self.items.append(Spacer(1, 0.1 * self.line_spacing * cm))
             self.content = ""
             for child in n.ast["children"]:
                 self.render(child)
+            if self.content:
+                self.items.append(
+                    Paragraph(self.content, self.styles["BodyText"]))
+                self.content = ""
         self.document.build(self.items,
                             onFirstPage=self.page_number,
                             onLaterPages=self.page_number)
@@ -107,7 +125,7 @@ class Operation(BaseOperation):
                 self.items.append(
                     Paragraph(self.content, self.styles["BodyText"]))
                 self.content = ""
-            self.items.append(Spacer(1, 0.1 * cm))
+            self.items.append(Spacer(1, 0.1 * self.line_spacing * cm))
         elif child["element"] == "heading":
             if self.content:
                 self.items.append(
@@ -118,9 +136,8 @@ class Operation(BaseOperation):
             self.items.append(
                 Paragraph(self.content, self.styles[f"Heading{child['level']}"]))
             self.content = ""
-        else:
-            if self.debug:
-                print("child", json.dumps(child, indent=2))
+        elif self.debug:
+            print("child", json.dumps(child, indent=2))
 
     def page_number(self, canvas, doc):
         canvas.saveState()

@@ -34,7 +34,7 @@ class Operation(BaseOperation):
             },
             "font_name": {
                 "type": "select",
-                "description": "The name of the font to use for body text.",
+                "description": "The font to use for body text.",
                 "values": ["Arial", "New Times Roman", "Calibri"],
                 "default": "Arial"
             }
