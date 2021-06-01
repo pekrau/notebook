@@ -1,6 +1,6 @@
 "Simple app for personal scrapbooks stored in the file system."
 
-__version__ = "1.2.3"
+__version__ = "1.2.4"
 
 import collections
 import glob
@@ -36,7 +36,6 @@ def get_settings():
         VERSION=__version__,
         SERVER_NAME="localhost.localdomain:5099",
         SECRET_KEY="this is a secret key",
-        DEBUG=True,
         JSON_AS_ASCII=False,
         IMAGE_EXTENSIONS=[".png", ".jpg", ".jpeg", ".svg", ".gif"],
         TEXT_EXTENSIONS=[".pdf", ".docx", ".txt"],
@@ -64,8 +63,6 @@ def get_settings():
     else:
         settings["SCRAPBOOK_DIRPATH"] = scrapbook
         settings["SCRAPBOOK_TITLE"] = os.path.basename(scrapbook)
-    if settings["DEBUG"]:
-        settings["TEMPLATES_AUTO_RELOAD"] = True
     return settings
 
 
@@ -1711,4 +1708,4 @@ def purge():
 if __name__ == "__main__":
     settings = get_settings()
     app.config.from_mapping(settings)
-    app.run(debug=settings["DEBUG"])
+    app.run()
