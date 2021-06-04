@@ -14,6 +14,7 @@ import uuid
 import flask
 import marko
 import marko.ast_renderer
+import markupsafe
 import jinja2.utils
 
 ROOT = None  # The root note. Created in 'setup'.
@@ -941,7 +942,7 @@ def get_md_ast_parser():
 
 def markdown(value):
     "Filter to process the value using augmented Marko markdown."
-    return jinja2.utils.Markup(get_md_parser().convert(value or ""))
+    return markupsafe.Markup(get_md_parser().convert(value or ""))
 
 
 def localtime(value):
@@ -1110,7 +1111,7 @@ def get_csrf_token():
         '<input type="hidden" name="_csrf_token" value="%s">'
         % flask.session["_csrf_token"]
     )
-    return jinja2.utils.Markup(html)
+    return markupsafe.Markup(html)
 
 
 def check_csrf_token():
