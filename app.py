@@ -1226,9 +1226,9 @@ def setup_template_context():
     "Add to the global context of Jinja2 templates."
     return dict(
         interactive=True,
-        flash_error=flash_error,
-        flash_warning=flash_warning,
-        flash_message=flash_message,
+        # flash_error=flash_error,
+        # flash_warning=flash_warning,
+        # flash_message=flash_message,
         get_operations=get_operations,
         get_csrf_token=get_csrf_token,
         get_starred=get_starred,
